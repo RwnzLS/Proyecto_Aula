@@ -49,6 +49,7 @@ public class OrdenService {
     this.email = email;
   }
 
+  @Transactional(readOnly = true)
   public Page<OrdenCompra> list(EstadoOrden estado, Long proveedorId, Pageable pageable) {
     Specification<OrdenCompra> spec = (root, query, cb) -> cb.conjunction();
     if (estado != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("estado"), estado));
@@ -91,6 +92,9 @@ public class OrdenService {
   @Transactional
   public OrdenCompra recepcion(Long id, RecepcionRequest request, Authentication auth) {
     OrdenCompra orden = get(id);
+    if (orden.getEstado() != EstadoOrden.ENVIADA && orden.getEstado() != EstadoOrden.RECIBIDA_PARCIAL) {
+      throw new BusinessException("Solo se puede recibir mercancia en ordenes ENVIADA o RECIBIDA_PARCIAL");
+    }
     Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow();
     Map<Long, DetalleOrden> byId = orden.getDetalles().stream().collect(Collectors.toMap(DetalleOrden::getId, d -> d));
     for (RecepcionItemRequest item : request.items()) {
@@ -115,6 +119,17 @@ public class OrdenService {
     return ordenes.save(orden);
   }
 
+  @Transactional
+  public OrdenCompra cancelar(Long id) {
+    OrdenCompra orden = get(id);
+    if (orden.getEstado() == EstadoOrden.RECIBIDA || orden.getEstado() == EstadoOrden.CANCELADA) {
+      throw new BusinessException("No se puede cancelar una orden en estado " + orden.getEstado());
+    }
+    orden.setEstado(EstadoOrden.CANCELADA);
+    return ordenes.save(orden);
+  }
+
+  @Transactional(readOnly = true)
   public OrdenCompra get(Long id) {
     return ordenes.findById(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
   }

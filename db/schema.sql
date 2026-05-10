@@ -1,4 +1,7 @@
 CREATE DATABASE IF NOT EXISTS inventario_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'inventario'@'localhost' IDENTIFIED BY 'inventario123';
+GRANT ALL PRIVILEGES ON inventario_db.* TO 'inventario'@'localhost';
+FLUSH PRIVILEGES;
 USE inventario_db;
 
 CREATE TABLE users (

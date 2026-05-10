@@ -38,6 +38,7 @@ public class ProductoService {
     this.opsEmail = opsEmail;
   }
 
+  @Transactional(readOnly = true)
   public Page<Producto> list(String categoria, String nombre, Boolean stockBajo, Pageable pageable) {
     Specification<Producto> spec = (root, query, cb) -> cb.conjunction();
     if (categoria != null && !categoria.isBlank()) spec = spec.and((r, q, cb) -> cb.equal(r.get("categoria"), categoria));
@@ -46,6 +47,7 @@ public class ProductoService {
     return productos.findAll(spec, pageable);
   }
 
+  @Transactional(readOnly = true)
   public List<Producto> stockBajo() {
     return productos.findAll((root, query, cb) -> cb.lessThanOrEqualTo(root.get("cantidadStock"), root.get("stockMinimo")));
   }
@@ -68,6 +70,7 @@ public class ProductoService {
     productos.save(producto);
   }
 
+  @Transactional(readOnly = true)
   public Producto get(Long id) {
     return productos.findById(id).orElseThrow(() -> new NotFoundException("Producto no encontrado"));
   }

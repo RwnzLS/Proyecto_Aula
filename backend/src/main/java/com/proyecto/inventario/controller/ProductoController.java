@@ -44,6 +44,12 @@ public class ProductoController {
     return ResponseEntity.ok(service.stockBajo());
   }
 
+  @GetMapping("/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE','ALMACENISTA')")
+  public ResponseEntity<?> get(@PathVariable Long id) {
+    return ResponseEntity.ok(service.get(id));
+  }
+
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<?> create(@Valid @RequestBody ProductoRequest request) {

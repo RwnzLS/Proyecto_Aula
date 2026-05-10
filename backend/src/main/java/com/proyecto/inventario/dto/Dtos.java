@@ -18,6 +18,7 @@ public final class Dtos {
   public record LoginRequest(@Email String email, @NotBlank String password) {}
   public record LoginResponse(String token, String nombre, String email, Rol rol) {}
   public record UserRequest(@NotBlank String nombre, @Email String email, @NotBlank String password, @NotNull Rol rol, Boolean activo) {}
+  public record UsuarioResponse(Long id, String nombre, String email, Rol rol, boolean activo, Instant fechaCreacion) {}
   public record ProductoRequest(@NotBlank String nombre, String descripcion, @NotBlank String codigo, String categoria, Integer cantidadStock, Integer stockMinimo, String unidadMedida, Boolean activo) {}
   public record ProveedorRequest(@NotBlank String nombre, String rucNit, @Email String email, String telefono, String direccion, Boolean activo) {}
   public record AjusteStockRequest(@NotNull Integer cantidad, @NotBlank String motivo) {}

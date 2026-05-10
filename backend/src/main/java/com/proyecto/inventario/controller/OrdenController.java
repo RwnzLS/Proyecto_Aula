@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -36,6 +37,12 @@ public class OrdenController {
     return ResponseEntity.ok(service.list(estado, proveedorId, pageable));
   }
 
+  @GetMapping("/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE','ALMACENISTA')")
+  public ResponseEntity<?> get(@PathVariable Long id) {
+    return ResponseEntity.ok(service.get(id));
+  }
+
   @PostMapping
   @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
   public ResponseEntity<?> create(@Valid @RequestBody OrdenRequest request, Authentication auth) {
@@ -52,5 +59,11 @@ public class OrdenController {
   @PreAuthorize("hasAnyRole('ADMIN','ALMACENISTA')")
   public ResponseEntity<?> recepcion(@PathVariable Long id, @Valid @RequestBody RecepcionRequest request, Authentication auth) {
     return ResponseEntity.ok(service.recepcion(id, request, auth));
+  }
+
+  @PatchMapping("/{id}/cancelar")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
+  public ResponseEntity<?> cancelar(@PathVariable Long id) {
+    return ResponseEntity.ok(service.cancelar(id));
   }
 }

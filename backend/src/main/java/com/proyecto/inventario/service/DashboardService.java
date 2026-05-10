@@ -1,14 +1,13 @@
 package com.proyecto.inventario.service;
 
 import com.proyecto.inventario.dto.Dtos.DashboardKpi;
-import com.proyecto.inventario.entity.Producto;
 import com.proyecto.inventario.model.EstadoOrden;
 import com.proyecto.inventario.repository.OrdenCompraRepository;
 import com.proyecto.inventario.repository.ProductoRepository;
 import com.proyecto.inventario.repository.ProveedorRepository;
 import java.util.List;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DashboardService {
@@ -22,9 +21,9 @@ public class DashboardService {
     this.ordenes = ordenes;
   }
 
+  @Transactional(readOnly = true)
   public DashboardKpi kpis() {
-    long stockBajo = productos.findAll((Specification<Producto>) (root, query, cb) ->
-      cb.lessThanOrEqualTo(root.get("cantidadStock"), root.get("stockMinimo"))).size();
+    long stockBajo = productos.countStockBajo();
     return new DashboardKpi(
       productos.countByActivoTrue(),
       stockBajo,

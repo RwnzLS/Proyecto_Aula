@@ -32,6 +32,12 @@ public class ProveedorController {
     return ResponseEntity.ok(service.list(nombre, pageable));
   }
 
+  @GetMapping("/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
+  public ResponseEntity<?> get(@PathVariable Long id) {
+    return ResponseEntity.ok(service.get(id));
+  }
+
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<?> create(@Valid @RequestBody ProveedorRequest request) {

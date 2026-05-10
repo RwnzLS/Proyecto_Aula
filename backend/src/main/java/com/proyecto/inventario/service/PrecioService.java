@@ -8,8 +8,10 @@ import com.proyecto.inventario.repository.ProductoRepository;
 import com.proyecto.inventario.repository.ProveedorRepository;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PrecioService {
@@ -23,14 +25,12 @@ public class PrecioService {
     this.proveedores = proveedores;
   }
 
+  @Transactional(readOnly = true)
   public List<PrecioProveedor> historial(Long productoId, Long proveedorId) {
-    Specification<PrecioProveedor> spec = (root, query, cb) -> {
-      query.orderBy(cb.desc(root.get("fechaRegistro")));
-      return cb.conjunction();
-    };
+    Specification<PrecioProveedor> spec = Specification.where(null);
     if (productoId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("producto").get("id"), productoId));
     if (proveedorId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("proveedor").get("id"), proveedorId));
-    return precios.findAll(spec);
+    return precios.findAll(spec, Sort.by(Sort.Direction.DESC, "fechaRegistro"));
   }
 
   public PrecioProveedor create(PrecioRequest request) {

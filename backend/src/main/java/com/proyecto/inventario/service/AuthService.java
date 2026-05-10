@@ -3,6 +3,7 @@ package com.proyecto.inventario.service;
 import com.proyecto.inventario.dto.Dtos.LoginRequest;
 import com.proyecto.inventario.dto.Dtos.LoginResponse;
 import com.proyecto.inventario.dto.Dtos.UserRequest;
+import com.proyecto.inventario.dto.Dtos.UsuarioResponse;
 import com.proyecto.inventario.entity.Usuario;
 import com.proyecto.inventario.repository.UsuarioRepository;
 import com.proyecto.inventario.security.JwtService;
@@ -34,7 +35,7 @@ public class AuthService {
     return new LoginResponse(jwt.generate(usuario), usuario.getNombre(), usuario.getEmail(), usuario.getRol());
   }
 
-  public Usuario create(UserRequest request) {
+  public UsuarioResponse create(UserRequest request) {
     Usuario usuario = new Usuario();
     usuario.setNombre(request.nombre());
     usuario.setEmail(request.email());
@@ -44,6 +45,17 @@ public class AuthService {
     Usuario saved = usuarios.save(usuario);
     email.sendTemplate(saved.getEmail(), "Bienvenido al sistema", "bienvenida",
       Map.of("nombre", saved.getNombre(), "email", saved.getEmail(), "passwordTemporal", request.password()));
-    return saved;
+    return toResponse(saved);
+  }
+
+  private UsuarioResponse toResponse(Usuario usuario) {
+    return new UsuarioResponse(
+      usuario.getId(),
+      usuario.getNombre(),
+      usuario.getEmail(),
+      usuario.getRol(),
+      usuario.isActivo(),
+      usuario.getFechaCreacion()
+    );
   }
 }

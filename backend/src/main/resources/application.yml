@@ -26,6 +26,8 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS:false}
 
 app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
   jwt:
     secret: ${JWT_SECRET:change-this-secret-key-with-at-least-32-characters}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}

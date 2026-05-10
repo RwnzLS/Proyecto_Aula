@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProveedorService {
@@ -17,6 +18,7 @@ public class ProveedorService {
     this.proveedores = proveedores;
   }
 
+  @Transactional(readOnly = true)
   public Page<Proveedor> list(String nombre, Pageable pageable) {
     Specification<Proveedor> spec = (root, query, cb) ->
       nombre == null || nombre.isBlank()
@@ -25,6 +27,7 @@ public class ProveedorService {
     return proveedores.findAll(spec, pageable);
   }
 
+  @Transactional(readOnly = true)
   public Proveedor get(Long id) {
     return proveedores.findById(id).orElseThrow(() -> new NotFoundException("Proveedor no encontrado"));
   }

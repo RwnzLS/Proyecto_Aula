@@ -1,10 +1,8 @@
 package com.proyecto.inventario.controller;
 
 import com.proyecto.inventario.dto.Dtos.UserRequest;
-import com.proyecto.inventario.entity.Usuario;
-import com.proyecto.inventario.exception.NotFoundException;
-import com.proyecto.inventario.repository.UsuarioRepository;
 import com.proyecto.inventario.service.AuthService;
+import com.proyecto.inventario.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,17 +21,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/usuarios")
 @PreAuthorize("hasRole('ADMIN')")
 public class UsuarioController {
-  private final UsuarioRepository usuarios;
+  private final UsuarioService service;
   private final AuthService authService;
 
-  public UsuarioController(UsuarioRepository usuarios, AuthService authService) {
-    this.usuarios = usuarios;
+  public UsuarioController(UsuarioService service, AuthService authService) {
+    this.service = service;
     this.authService = authService;
   }
 
   @GetMapping
   public ResponseEntity<?> list(Pageable pageable) {
-    return ResponseEntity.ok(usuarios.findAll(pageable));
+    return ResponseEntity.ok(service.list(pageable));
   }
 
   @PostMapping
@@ -43,8 +41,6 @@ public class UsuarioController {
 
   @PatchMapping("/{id}/activo")
   public ResponseEntity<?> activo(@PathVariable Long id, @RequestParam boolean activo) {
-    Usuario usuario = usuarios.findById(id).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
-    usuario.setActivo(activo);
-    return ResponseEntity.ok(usuarios.save(usuario));
+    return ResponseEntity.ok(service.toggleActivo(id, activo));
   }
 }
