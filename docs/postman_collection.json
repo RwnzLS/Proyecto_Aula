@@ -1,0 +1,97 @@
+{
+  "info": {
+    "name": "Inventario Proveedores API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080/api"},
+    {"key": "token", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Auth Login",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {"mode": "raw", "raw": "{\"email\":\"admin@inventario.local\",\"password\":\"password\"}"}
+      }
+    },
+    {
+      "name": "Registrar Usuario",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/auth/register",
+        "body": {"mode": "raw", "raw": "{\"nombre\":\"Gerente\",\"email\":\"gerente@inventario.local\",\"password\":\"password\",\"rol\":\"GERENTE\",\"activo\":true}"}
+      }
+    },
+    {"name": "Listar Productos", "request": {"method": "GET", "url": "{{baseUrl}}/productos?page=0&size=10&nombre=&categoria="}},
+    {"name": "Stock Bajo", "request": {"method": "GET", "url": "{{baseUrl}}/productos/stock-bajo"}},
+    {
+      "name": "Crear Producto",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/productos",
+        "body": {"mode": "raw", "raw": "{\"nombre\":\"Producto demo\",\"descripcion\":\"Demo\",\"codigo\":\"DEMO-001\",\"categoria\":\"Demo\",\"cantidadStock\":10,\"stockMinimo\":5,\"unidadMedida\":\"unidad\",\"activo\":true}"}
+      }
+    },
+    {
+      "name": "Ajustar Stock",
+      "request": {
+        "method": "PATCH",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/productos/1/ajustar-stock",
+        "body": {"mode": "raw", "raw": "{\"cantidad\":5,\"motivo\":\"Ajuste inicial\"}"}
+      }
+    },
+    {"name": "Listar Proveedores", "request": {"method": "GET", "url": "{{baseUrl}}/proveedores?page=0&size=10&nombre="}},
+    {
+      "name": "Crear Proveedor",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/proveedores",
+        "body": {"mode": "raw", "raw": "{\"nombre\":\"Proveedor demo\",\"rucNit\":\"123456\",\"email\":\"proveedor@test.local\",\"telefono\":\"3000000000\",\"direccion\":\"Principal\",\"activo\":true}"}
+      }
+    },
+    {"name": "Historial Precios", "request": {"method": "GET", "url": "{{baseUrl}}/precios/historial?productoId=1&proveedorId=1"}},
+    {
+      "name": "Registrar Precio",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/precios",
+        "body": {"mode": "raw", "raw": "{\"productoId\":1,\"proveedorId\":1,\"precioUnitario\":150.00,\"moneda\":\"COP\"}"}
+      }
+    },
+    {
+      "name": "Crear Orden",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/ordenes",
+        "body": {"mode": "raw", "raw": "{\"proveedorId\":1,\"fechaEsperada\":\"2026-06-01\",\"observaciones\":\"Orden demo\",\"detalles\":[{\"productoId\":1,\"cantidadSolicitada\":10,\"precioUnitario\":135.00}]}"}
+      }
+    },
+    {"name": "Enviar Orden", "request": {"method": "PUT", "url": "{{baseUrl}}/ordenes/1/enviar"}},
+    {"name": "Listar Ordenes", "request": {"method": "GET", "url": "{{baseUrl}}/ordenes?page=0&size=10&estado=ENVIADA"}},
+    {
+      "name": "Recepcion Orden",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/ordenes/1/recepcion",
+        "body": {"mode": "raw", "raw": "{\"items\":[{\"detalleId\":1,\"cantidadRecibida\":5}]}"}
+      }
+    },
+    {"name": "Movimientos", "request": {"method": "GET", "url": "{{baseUrl}}/movimientos?page=0&size=10"}},
+    {"name": "Dashboard", "request": {"method": "GET", "url": "{{baseUrl}}/dashboard"}},
+    {"name": "Usuarios", "request": {"method": "GET", "url": "{{baseUrl}}/usuarios?page=0&size=10"}}
+  ]
+}

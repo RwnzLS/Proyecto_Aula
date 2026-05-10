@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/inventario_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:inventario}
+    password: ${DB_PASSWORD:inventario123}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-secret-key-with-at-least-32-characters}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  mail:
+    from: ${MAIL_FROM:no-reply@inventario.local}
+    ops-email: ${OPS_EMAIL:admin@inventario.local}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

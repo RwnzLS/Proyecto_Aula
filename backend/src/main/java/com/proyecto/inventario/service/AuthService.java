@@ -1,0 +1,49 @@
+package com.proyecto.inventario.service;
+
+import com.proyecto.inventario.dto.Dtos.LoginRequest;
+import com.proyecto.inventario.dto.Dtos.LoginResponse;
+import com.proyecto.inventario.dto.Dtos.UserRequest;
+import com.proyecto.inventario.entity.Usuario;
+import com.proyecto.inventario.repository.UsuarioRepository;
+import com.proyecto.inventario.security.JwtService;
+import java.util.Map;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class AuthService {
+  private final UsuarioRepository usuarios;
+  private final PasswordEncoder encoder;
+  private final JwtService jwt;
+  private final AuthenticationManager auth;
+  private final EmailService email;
+
+  public AuthService(UsuarioRepository usuarios, PasswordEncoder encoder, JwtService jwt, AuthenticationManager auth, EmailService email) {
+    this.usuarios = usuarios;
+    this.encoder = encoder;
+    this.jwt = jwt;
+    this.auth = auth;
+    this.email = email;
+  }
+
+  public LoginResponse login(LoginRequest request) {
+    auth.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+    Usuario usuario = usuarios.findByEmail(request.email()).orElseThrow();
+    return new LoginResponse(jwt.generate(usuario), usuario.getNombre(), usuario.getEmail(), usuario.getRol());
+  }
+
+  public Usuario create(UserRequest request) {
+    Usuario usuario = new Usuario();
+    usuario.setNombre(request.nombre());
+    usuario.setEmail(request.email());
+    usuario.setPassword(encoder.encode(request.password()));
+    usuario.setRol(request.rol());
+    usuario.setActivo(request.activo() == null || request.activo());
+    Usuario saved = usuarios.save(usuario);
+    email.sendTemplate(saved.getEmail(), "Bienvenido al sistema", "bienvenida",
+      Map.of("nombre", saved.getNombre(), "email", saved.getEmail(), "passwordTemporal", request.password()));
+    return saved;
+  }
+}
