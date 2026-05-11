@@ -13,7 +13,12 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "movimientos_inventario", indexes = @Index(name = "idx_mov_producto", columnList = "producto_id"))
+@Table(name = "movimientos_inventario", indexes = {
+  @Index(name = "idx_mov_producto", columnList = "producto_id"),
+  @Index(name = "idx_mov_fecha", columnList = "fecha"),
+  @Index(name = "idx_mov_tipo_fecha", columnList = "tipo_movimiento, fecha"),
+  @Index(name = "idx_mov_producto_fecha", columnList = "producto_id, fecha")
+})
 public class MovimientoInventario {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

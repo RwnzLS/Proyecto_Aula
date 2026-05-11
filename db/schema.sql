@@ -101,5 +101,7 @@ CREATE TABLE movimientos_inventario (
   CONSTRAINT fk_mov_usuario FOREIGN KEY (usuario_responsable_id) REFERENCES users(id),
   CONSTRAINT chk_mov_tipo CHECK (tipo_movimiento IN ('ENTRADA','SALIDA','AJUSTE')),
   INDEX idx_mov_producto (producto_id),
-  INDEX idx_mov_fecha (fecha)
+  INDEX idx_mov_fecha (fecha),
+  INDEX idx_mov_tipo_fecha (tipo_movimiento, fecha),
+  INDEX idx_mov_producto_fecha (producto_id, fecha)
 );

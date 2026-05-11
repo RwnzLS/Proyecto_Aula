@@ -68,7 +68,7 @@ La URL del API se configura en `frontend/src/environments/environment.ts`.
 
 - `ADMIN`: usuarios, productos, proveedores, precios, ordenes, recepcion, movimientos y dashboard.
 - `GERENTE`: consulta productos/proveedores, precios, crear/enviar ordenes, dashboard.
-- `ALMACENISTA`: consulta productos, ajuste de stock, recepcion y movimientos.
+- `ALMACENISTA`: consulta productos, entradas, salidas, ajuste de stock, recepcion y movimientos.
 
 ## Endpoints principales
 
@@ -83,5 +83,7 @@ La URL del API se configura en `frontend/src/environments/environment.ts`.
 - `POST /api/ordenes`
 - `PUT /api/ordenes/{id}/enviar`
 - `POST /api/ordenes/{id}/recepcion`
-- `GET /api/movimientos`
+- `POST /api/entradas`
+- `POST /api/salidas`
+- `GET /api/movimientos` con filtros `productoId`, `tipoMovimiento`, `fechaDesde`, `fechaHasta`
 - `GET /api/dashboard`

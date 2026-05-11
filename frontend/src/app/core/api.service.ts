@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { DashboardKpi, EstadoOrden, MovimientoInventario, OrdenCompra, Page, PrecioProveedor, Producto, Proveedor, UsuarioResponse } from './models';
+import { DashboardKpi, EstadoOrden, MovimientoInventario, OrdenCompra, Page, PrecioProveedor, Producto, Proveedor, TipoMovimiento, UsuarioResponse } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -15,6 +15,8 @@ export class ApiService {
   crearProducto(body: Partial<Producto>) { return this.http.post<Producto>(`${this.api}/productos`, body); }
   actualizarProducto(id: number, body: Partial<Producto>) { return this.http.put<Producto>(`${this.api}/productos/${id}`, body); }
   ajustarStock(id: number, cantidad: number, motivo: string) { return this.http.patch<Producto>(`${this.api}/productos/${id}/ajustar-stock`, { cantidad, motivo }); }
+  registrarEntrada(body: { productoId: number; cantidad: number; referencia: string }) { return this.http.post<MovimientoInventario>(`${this.api}/entradas`, body); }
+  registrarSalida(body: { productoId: number; cantidad: number; referencia: string }) { return this.http.post<MovimientoInventario>(`${this.api}/salidas`, body); }
 
   proveedores(filters: { nombre?: string | null; page?: number; size?: number } = {}) {
     return this.http.get<Page<Proveedor>>(`${this.api}/proveedores`, { params: this.params(filters) });
@@ -30,7 +32,7 @@ export class ApiService {
   cancelarOrden(id: number) { return this.http.patch<OrdenCompra>(`${this.api}/ordenes/${id}/cancelar`, {}); }
   recibirOrden(id: number, items: { detalleId: number; cantidadRecibida: number }[]) { return this.http.post<OrdenCompra>(`${this.api}/ordenes/${id}/recepcion`, { items }); }
 
-  movimientos(filters: { productoId?: number; page?: number; size?: number } = {}) {
+  movimientos(filters: { productoId?: number | null; tipoMovimiento?: TipoMovimiento | null; fechaDesde?: string | null; fechaHasta?: string | null; page?: number; size?: number } = {}) {
     return this.http.get<Page<MovimientoInventario>>(`${this.api}/movimientos`, { params: this.params(filters) });
   }
 

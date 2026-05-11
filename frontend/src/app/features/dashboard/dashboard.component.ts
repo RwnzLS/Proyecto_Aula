@@ -14,8 +14,8 @@ import { AuthService } from '../../core/auth.service';
 import { DashboardKpi, MovimientoInventario, Producto, Rol } from '../../core/models';
 import { ThemeService } from '../../core/theme.service';
 import { WorkspaceNavigationService } from '../../core/workspace-navigation.service';
+import { StockMovementDialogComponent, StockMovementDialogResult } from '../movimientos/stock-movement-dialog.component';
 import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.component';
-import { EntradaStockDialogComponent, EntradaStockDialogResult } from './entrada-stock-dialog.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -377,10 +377,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    const ref = this.dialog.open(EntradaStockDialogComponent, { width: '520px', data: { productos: this.productos, producto } });
-    ref.afterClosed().subscribe((result?: EntradaStockDialogResult) => {
+    const ref = this.dialog.open(StockMovementDialogComponent, { width: '520px', data: { productos: this.productos, producto, tipo: 'ENTRADA' } });
+    ref.afterClosed().subscribe((result?: StockMovementDialogResult) => {
       if (!result) return;
-      this.api.ajustarStock(result.productoId, result.cantidad, result.motivo).subscribe(() => {
+      this.api.registrarEntrada(result).subscribe(() => {
         this.snack.open('Entrada registrada', 'Cerrar', { duration: 2500 });
         this.load();
       });

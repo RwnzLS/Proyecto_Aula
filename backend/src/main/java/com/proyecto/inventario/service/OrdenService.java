@@ -102,7 +102,8 @@ public class OrdenService {
       int nuevoTotal = detalle.getCantidadRecibida() + item.cantidadRecibida();
       if (nuevoTotal > detalle.getCantidadSolicitada()) throw new BusinessException("Cantidad recibida supera la solicitada");
       detalle.setCantidadRecibida(nuevoTotal);
-      Producto producto = detalle.getProducto();
+      Producto producto = productos.findByIdForUpdate(detalle.getProducto().getId())
+        .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
       producto.setCantidadStock(producto.getCantidadStock() + item.cantidadRecibida());
       MovimientoInventario movimiento = new MovimientoInventario();
       movimiento.setProducto(producto);

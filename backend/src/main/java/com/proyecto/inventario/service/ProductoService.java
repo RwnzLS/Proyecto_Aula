@@ -77,7 +77,7 @@ public class ProductoService {
 
   @Transactional
   public Producto ajustar(Long id, AjusteStockRequest request, Authentication auth) {
-    Producto producto = get(id);
+    Producto producto = productos.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Producto no encontrado"));
     producto.setCantidadStock(Math.max(0, producto.getCantidadStock() + request.cantidad()));
     MovimientoInventario movimiento = new MovimientoInventario();
     movimiento.setProducto(producto);
