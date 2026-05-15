@@ -249,7 +249,8 @@ td.mat-mdc-cell {
 }
 
 .mat-mdc-row {
-  transition: background var(--app-dur-fast) var(--app-ease-out);
+  transition: background var(--app-dur-base) var(--app-ease-out),
+              box-shadow var(--app-dur-base) var(--app-ease-out);
 }
 
 .mat-mdc-row:hover {

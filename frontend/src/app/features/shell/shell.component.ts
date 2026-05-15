@@ -1,17 +1,21 @@
 import { CommonModule } from '@angular/common';
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { Rol } from '../../core/models';
 import { ThemeService } from '../../core/theme.service';
+import { KeyboardShortcutsService } from '../../shared/keyboard-shortcuts.service';
+import { ShortcutsDialogComponent } from '../../shared/shortcuts-dialog.component';
 
 interface NavItem {
   label: string;
@@ -56,15 +60,19 @@ const NAV_GROUPS: NavGroup[] = [
   imports: [
     CommonModule,
     MatButtonModule,
+    MatDialogModule,
     MatIconModule,
     MatListModule,
     MatSidenavModule,
     MatToolbarModule,
+    MatTooltipModule,
     RouterLink,
     RouterLinkActive,
     RouterOutlet
   ],
   template: `
+    <a class="skip-link" href="#main-content">Saltar al contenido</a>
+
     <mat-toolbar color="primary" class="app-topbar">
       <button
         *ngIf="isMobile()"
@@ -86,6 +94,9 @@ const NAV_GROUPS: NavGroup[] = [
         <mat-icon>verified_user</mat-icon>
         <span>{{ auth.session()?.nombre }} - {{ auth.session()?.rol }}</span>
       </div>
+      <button mat-icon-button class="theme-toggle" matTooltip="Atajos de teclado (?)" aria-label="Ver atajos de teclado" (click)="abrirAtajos()">
+        <mat-icon>keyboard</mat-icon>
+      </button>
       <button mat-icon-button class="theme-toggle" [title]="theme.label()" [attr.aria-label]="theme.label()" (click)="theme.toggle()">
         <mat-icon>{{ theme.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
       </button>
@@ -110,6 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
                 *ngFor="let item of group.items"
                 [routerLink]="item.link"
                 routerLinkActive="shell-nav__item--active"
+                [ariaCurrentWhenActive]="'page'"
                 (click)="onNavClick()">
                 <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
                 <span matListItemTitle>{{ item.label }}</span>
@@ -120,7 +132,7 @@ const NAV_GROUPS: NavGroup[] = [
       </mat-sidenav>
 
       <mat-sidenav-content class="shell-content">
-        <main class="page" id="main-content">
+        <main class="page" id="main-content" tabindex="-1">
           <router-outlet></router-outlet>
         </main>
       </mat-sidenav-content>
@@ -164,7 +176,7 @@ const NAV_GROUPS: NavGroup[] = [
     .shell-nav .mat-mdc-list-item {
       border-radius: var(--app-radius-3);
       margin: 0 var(--app-space-3);
-      transition: background var(--app-dur-fast) var(--app-ease-out);
+      transition: background var(--app-dur-base) var(--app-ease-out);
     }
 
     .shell-nav .mat-mdc-list-item:hover {
@@ -189,13 +201,18 @@ const NAV_GROUPS: NavGroup[] = [
       margin-right: var(--app-space-2);
     }
 
+    main#main-content:focus { outline: none; }
+
     @media (max-width: 1023px) {
       .shell-sidenav { width: 280px; }
     }
   `]
 })
-export class ShellComponent {
+export class ShellComponent implements OnInit {
   private readonly breakpoint = inject(BreakpointObserver);
+  private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+  private readonly shortcuts = inject(KeyboardShortcutsService);
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
 
@@ -212,6 +229,19 @@ export class ShellComponent {
       .filter(group => group.items.length > 0)
   );
 
+  ngOnInit(): void {
+    this.shortcuts.start();
+    this.shortcuts.register('?', () => this.abrirAtajos());
+    this.shortcuts.register('/', () => this.focusPrimerFiltro());
+    this.shortcuts.register('g d', () => this.go('/dashboard'));
+    this.shortcuts.register('g p', () => this.go('/productos'));
+    this.shortcuts.register('g m', () => this.go('/movimientos'));
+    this.shortcuts.register('g s', () => this.go('/proveedores'));
+    this.shortcuts.register('g r', () => this.go('/precios'));
+    this.shortcuts.register('g o', () => this.go('/ordenes'));
+    this.shortcuts.register('g u', () => this.go('/usuarios'));
+  }
+
   toggleSidenav(): void {
     this.sidenavOpen.update(open => !open);
   }
@@ -220,5 +250,32 @@ export class ShellComponent {
     if (this.isMobile()) {
       this.sidenavOpen.set(false);
     }
+  }
+
+  abrirAtajos(): void {
+    if (this.dialog.openDialogs.some(ref => ref.componentInstance instanceof ShortcutsDialogComponent)) {
+      return;
+    }
+    this.dialog.open(ShortcutsDialogComponent, {
+      width: '520px',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+      ariaLabel: 'Atajos de teclado disponibles'
+    });
+  }
+
+  private go(path: string): void {
+    if (this.auth.session()) {
+      this.router.navigateByUrl(path);
+    }
+  }
+
+  private focusPrimerFiltro(): void {
+    const root = document.getElementById('main-content');
+    if (!root) return;
+    const target = root.querySelector<HTMLElement>(
+      '.filter-panel input, .filter-panel .mat-mdc-select-trigger, .filters-panel input, .filters-panel .mat-mdc-select-trigger'
+    );
+    target?.focus();
   }
 }
