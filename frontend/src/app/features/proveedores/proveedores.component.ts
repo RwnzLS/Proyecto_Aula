@@ -1,17 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { PageEvent } from '@angular/material/paginator';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Page, Proveedor, Rol } from '../../core/models';
 import { NotifyService } from '../../shared/notify.service';
+import { PageHeaderComponent } from '../../shared/page-header.component';
 import {
   CellDefDirective,
   DataTableComponent,
@@ -26,41 +29,41 @@ import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component'
     CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
+    MatChipsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatTooltipModule,
     DataTableComponent,
-    CellDefDirective
+    CellDefDirective,
+    PageHeaderComponent
   ],
   template: `
     <section class="module-page">
-      <div class="module-hero">
-        <div class="module-title">
-          <span class="eyebrow">Abastecimiento</span>
-          <h1>Proveedores</h1>
-          <p>Administra contactos y datos comerciales de los aliados de compra.</p>
-        </div>
-        <div class="module-actions">
-          <button mat-stroked-button type="button" (click)="loadProveedores()">
-            <mat-icon>refresh</mat-icon>
-            Actualizar
+      <app-page-header eyebrow="Abastecimiento" title="Proveedores" subtitle="Administra contactos y datos comerciales de los aliados de compra.">
+        <button actions mat-stroked-button type="button" (click)="loadProveedores()">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
+        @if (can(['ADMIN'])) {
+          <button actions mat-raised-button color="primary" type="button" (click)="abrirProveedor()">
+            <mat-icon>add</mat-icon>
+            Proveedor
           </button>
-          @if (can(['ADMIN'])) {
-            <button mat-raised-button color="primary" type="button" (click)="abrirProveedor()">
-              <mat-icon>add</mat-icon>
-              Proveedor
-            </button>
-          }
-        </div>
-      </div>
+        }
+      </app-page-header>
 
       <div class="filter-panel">
         <form [formGroup]="filtro" class="grid form-grid">
-          <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="nombre"></mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Buscar por nombre</mat-label>
+            <input matInput formControlName="nombre" placeholder="Escribe parte del nombre...">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
         </form>
         <div class="panel-actions">
-          <button mat-stroked-button type="button" (click)="limpiarFiltro()">
+          <button mat-stroked-button type="button" (click)="limpiarFiltro()" matTooltip="Quitar filtros">
             <mat-icon>filter_alt_off</mat-icon>
             Limpiar
           </button>
@@ -84,19 +87,85 @@ import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component'
           [pageSize]="pageSize"
           [emptyState]="emptyState"
           (page)="onPage($event)">
+          <ng-template [appCellDef]="'nombre'" let-row>
+            <div class="nombre-cell">
+              <span class="u-truncate">{{ row.nombre }}</span>
+              @if (!row.activo) {
+                <mat-chip class="chip-inactivo" disableRipple>Inactivo</mat-chip>
+              }
+            </div>
+          </ng-template>
+          <ng-template [appCellDef]="'contacto'" let-row>
+            <div class="contacto-cell">
+              @if (row.email) {
+                <a [href]="'mailto:' + row.email" class="contacto-link">
+                  <mat-icon>mail_outline</mat-icon>
+                  {{ row.email }}
+                </a>
+              }
+              @if (row.telefono) {
+                <span class="contacto-tel u-text-muted">
+                  <mat-icon>call</mat-icon>
+                  {{ row.telefono }}
+                </span>
+              }
+              @if (!row.email && !row.telefono) {
+                <span class="u-text-muted">—</span>
+              }
+            </div>
+          </ng-template>
           <ng-template [appCellDef]="'acciones'" let-row>
             <div class="actions">
               @if (can(['ADMIN'])) {
-                <button mat-icon-button title="Editar" (click)="abrirProveedor(row)"><mat-icon>edit</mat-icon></button>
+                <button mat-icon-button matTooltip="Editar proveedor" (click)="abrirProveedor(row)">
+                  <mat-icon>edit</mat-icon>
+                </button>
               }
             </div>
           </ng-template>
         </app-data-table>
       </div>
     </section>
-  `
+  `,
+  styles: [`
+    .nombre-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--app-space-2);
+    }
+    .chip-inactivo {
+      --mdc-chip-elevated-container-color: var(--app-surface-muted);
+      color: var(--app-muted-strong);
+      font-size: var(--app-font-12);
+      height: 22px;
+    }
+    .contacto-cell {
+      display: grid;
+      gap: 4px;
+    }
+    .contacto-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--app-brand-strong);
+      text-decoration: none;
+    }
+    .contacto-link:hover { text-decoration: underline; }
+    .contacto-tel {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .contacto-cell mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  `]
 })
 export class ProveedoresComponent implements OnInit {
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
+  private readonly fb = inject(FormBuilder);
+  private readonly dialog = inject(MatDialog);
+  private readonly notify = inject(NotifyService);
+
   loading = false;
   proveedores: Proveedor[] = [];
   proveedoresPage?: Page<Proveedor>;
@@ -105,25 +174,18 @@ export class ProveedoresComponent implements OnInit {
   filtro = this.fb.group({ nombre: [''] });
 
   readonly columns: TableColumn<Proveedor>[] = [
-    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true, value: row => row.nombre },
     { key: 'rucNit', header: 'RUC/NIT', sortable: true },
-    { key: 'email', header: 'Email', sortable: true },
+    { key: 'contacto', header: 'Contacto' },
+    { key: 'direccion', header: 'Direccion' },
     { key: 'acciones', header: 'Acciones', align: 'end' }
   ];
 
   readonly emptyState = {
     icon: 'business',
     title: 'No hay proveedores para mostrar',
-    message: 'Ajusta la busqueda o crea un proveedor.'
+    message: 'Ajusta la busqueda o registra un nuevo proveedor.'
   };
-
-  constructor(
-    private api: ApiService,
-    private auth: AuthService,
-    private fb: FormBuilder,
-    private dialog: MatDialog,
-    private notify: NotifyService
-  ) {}
 
   ngOnInit() {
     this.loadProveedores();
