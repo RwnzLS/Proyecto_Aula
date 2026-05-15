@@ -1,34 +1,50 @@
-import { DatePipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
-import { Chart } from 'chart.js/auto';
+import { Chart, TooltipItem } from 'chart.js/auto';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
 import { forkJoin } from 'rxjs';
+import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { DashboardKpi, MovimientoInventario, MovimientoTipoResumen, Producto, Rol } from '../../core/models';
-import { Router } from '@angular/router';
 import { ThemeService } from '../../core/theme.service';
+import { NotifyService } from '../../shared/notify.service';
+import {
+  CellDefDirective,
+  DataTableComponent,
+  TableColumn
+} from '../../shared/data-table.component';
+import { SkeletonTableComponent } from '../../shared/skeleton-table.component';
 import { StockMovementDialogComponent, StockMovementDialogResult } from '../movimientos/stock-movement-dialog.component';
 import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.component';
+
+type KpiTone = 'stock' | 'sales' | 'orders' | 'alerts';
+
+interface KpiCard {
+  label: string;
+  value: number;
+  icon: string;
+  note: string;
+  tone: KpiTone;
+  trend?: string;
+}
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [
+    CommonModule,
     DatePipe,
     MatButtonModule,
     MatChipsModule,
     MatDialogModule,
     MatIconModule,
-    MatProgressBarModule,
-    MatSnackBarModule,
-    MatTableModule
+    DataTableComponent,
+    CellDefDirective,
+    SkeletonTableComponent
   ],
   template: `
     <section class="module-page dashboard-page">
@@ -39,35 +55,39 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
           <p>Lectura rapida de stock, salidas, ordenes, alertas y actividad reciente.</p>
         </div>
         <div class="module-actions">
-          <button mat-stroked-button type="button" (click)="load()">
+          <button mat-stroked-button type="button" (click)="load()" [disabled]="loading">
             <mat-icon>refresh</mat-icon>
             Actualizar
           </button>
         </div>
       </div>
 
-      @if (loading) {
-        <mat-progress-bar mode="indeterminate" />
-      }
-
       <section class="dashboard-section">
         <div class="section-heading">
           <span class="eyebrow">KPIs principales</span>
         </div>
-        <div class="grid kpi-grid">
-          @for (item of kpiCards; track item.label) {
-            <article class="metric-card">
+        <ng-container *ngIf="loaded; else kpiSkeleton">
+          <div class="grid kpi-grid">
+            <article *ngFor="let item of kpiCards" class="metric-card" [class]="'metric-card--' + item.tone">
               <div class="metric-top">
-                <div>
+                <div class="metric-info">
                   <p class="metric-label">{{ item.label }}</p>
                   <h2 class="metric-value">{{ item.value }}</h2>
                 </div>
-                <div class="metric-icon"><mat-icon>{{ item.icon }}</mat-icon></div>
+                <div class="metric-icon" [class]="'metric-icon--' + item.tone">
+                  <mat-icon>{{ item.icon }}</mat-icon>
+                </div>
               </div>
-              <p class="metric-note">{{ item.note }}</p>
+              <div class="metric-bottom">
+                <p class="metric-note">{{ item.note }}</p>
+                <span *ngIf="item.trend" class="metric-trend">{{ item.trend }}</span>
+              </div>
             </article>
-          }
-        </div>
+          </div>
+        </ng-container>
+        <ng-template #kpiSkeleton>
+          <app-skeleton-table [rows]="1" [columns]="4"></app-skeleton-table>
+        </ng-template>
       </section>
 
       <section class="dashboard-section">
@@ -80,7 +100,21 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
               <h2>Movimientos</h2>
               <p>Distribucion por tipo en los ultimos registros.</p>
             </div>
-            <canvas #movementsChart></canvas>
+            <div class="doughnut-layout">
+              <div class="doughnut-canvas">
+                <canvas #movementsChart></canvas>
+              </div>
+              <ul class="doughnut-legend" *ngIf="movimientosPorTipo.length; else sinMovimientos">
+                <li *ngFor="let item of movimientosPorTipo">
+                  <span class="legend-dot" [class]="'legend-dot--' + chipMovimiento(item.tipoMovimiento)"></span>
+                  <span class="legend-label">{{ item.tipoMovimiento }}</span>
+                  <span class="legend-value">{{ item.cantidad }} <small>unidades</small></span>
+                </li>
+              </ul>
+              <ng-template #sinMovimientos>
+                <p class="doughnut-empty">Sin movimientos registrados aun.</p>
+              </ng-template>
+            </div>
           </article>
           <article class="chart-box dashboard-chart">
             <div class="panel-title">
@@ -88,13 +122,11 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
               <p>Ranking calculado con movimientos de tipo SALIDA.</p>
             </div>
             <canvas #salesChart [class.hidden-chart]="!topSales.length"></canvas>
-            @if (!topSales.length) {
-              <div class="empty-state compact">
-                <mat-icon>point_of_sale</mat-icon>
-                <h3>Sin salidas registradas</h3>
-                <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
-              </div>
-            }
+            <div *ngIf="!topSales.length" class="empty-state compact">
+              <mat-icon>point_of_sale</mat-icon>
+              <h3>Sin salidas registradas</h3>
+              <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
+            </div>
           </article>
         </div>
       </section>
@@ -112,31 +144,27 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
               </div>
               <span class="count-pill">{{ productosCriticos.length }}</span>
             </div>
-            @if (productosCriticos.length) {
-              <div class="table-wrap">
-                <table mat-table [dataSource]="productosCriticos">
-                  <ng-container matColumnDef="codigo"><th mat-header-cell *matHeaderCellDef>Codigo</th><td mat-cell *matCellDef="let p">{{ p.codigo }}</td></ng-container>
-                  <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Producto</th><td mat-cell *matCellDef="let p">{{ p.nombre }}</td></ng-container>
-                  <ng-container matColumnDef="stock"><th mat-header-cell *matHeaderCellDef>Stock</th><td mat-cell *matCellDef="let p"><mat-chip class="chip-danger">{{ p.cantidadStock }} / {{ p.stockMinimo }}</mat-chip></td></ng-container>
-                  <ng-container matColumnDef="accion">
-                    <th mat-header-cell *matHeaderCellDef>Accion</th>
-                    <td mat-cell *matCellDef="let p">
-                      @if (can(['ADMIN','ALMACENISTA'])) {
-                        <button mat-icon-button title="Registrar entrada" (click)="registrarEntrada(p)"><mat-icon>add_box</mat-icon></button>
-                      }
-                    </td>
-                  </ng-container>
-                  <tr mat-header-row *matHeaderRowDef="criticosCols"></tr>
-                  <tr mat-row *matRowDef="let row; columns: criticosCols;"></tr>
-                </table>
-              </div>
-            } @else {
-              <div class="empty-state compact">
-                <mat-icon>task_alt</mat-icon>
-                <h3>Inventario estable</h3>
-                <p>No hay productos por debajo del minimo.</p>
-              </div>
-            }
+            <app-data-table
+              [columns]="criticosColumns"
+              [rows]="productosCriticos"
+              [loading]="loading && !loaded"
+              [paginator]="false"
+              [emptyState]="criticosEmpty">
+              <ng-template [appCellDef]="'stock'" let-row>
+                <mat-chip class="chip-danger">{{ row.cantidadStock }} / {{ row.stockMinimo }}</mat-chip>
+              </ng-template>
+              <ng-template [appCellDef]="'accion'" let-row>
+                <div class="actions">
+                  <button
+                    *ngIf="can(['ADMIN','ALMACENISTA'])"
+                    mat-icon-button
+                    title="Registrar entrada"
+                    (click)="registrarEntrada(row)">
+                    <mat-icon>add_box</mat-icon>
+                  </button>
+                </div>
+              </ng-template>
+            </app-data-table>
           </article>
 
           <article class="data-panel">
@@ -147,24 +175,18 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
               </div>
               <span class="count-pill">{{ actividadReciente.length }}</span>
             </div>
-            @if (actividadReciente.length) {
-              <div class="table-wrap">
-                <table mat-table [dataSource]="actividadReciente">
-                  <ng-container matColumnDef="fecha"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let m">{{ m.fecha | date:'short' }}</td></ng-container>
-                  <ng-container matColumnDef="producto"><th mat-header-cell *matHeaderCellDef>Producto</th><td mat-cell *matCellDef="let m">{{ m.producto.nombre }}</td></ng-container>
-                  <ng-container matColumnDef="tipo"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let m"><mat-chip [class]="chipMovimiento(m.tipoMovimiento)">{{ m.tipoMovimiento }}</mat-chip></td></ng-container>
-                  <ng-container matColumnDef="cantidad"><th mat-header-cell *matHeaderCellDef>Cant.</th><td mat-cell *matCellDef="let m">{{ m.cantidad }}</td></ng-container>
-                  <tr mat-header-row *matHeaderRowDef="actividadCols"></tr>
-                  <tr mat-row *matRowDef="let row; columns: actividadCols;"></tr>
-                </table>
-              </div>
-            } @else {
-              <div class="empty-state compact">
-                <mat-icon>history</mat-icon>
-                <h3>Sin actividad reciente</h3>
-                <p>Las entradas, salidas y ajustes apareceran aqui.</p>
-              </div>
-            }
+            <app-data-table
+              [columns]="actividadColumns"
+              [rows]="actividadReciente"
+              [loading]="loading && !loaded"
+              [paginator]="false"
+              [emptyState]="actividadEmpty">
+              <ng-template [appCellDef]="'fecha'" let-row>{{ row.fecha | date:'short' }}</ng-template>
+              <ng-template [appCellDef]="'producto'" let-row>{{ row.producto.nombre }}</ng-template>
+              <ng-template [appCellDef]="'tipo'" let-row>
+                <mat-chip [class]="chipMovimiento(row.tipoMovimiento)">{{ row.tipoMovimiento }}</mat-chip>
+              </ng-template>
+            </app-data-table>
           </article>
         </div>
       </section>
@@ -174,24 +196,39 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
           <span class="eyebrow">Acciones rapidas</span>
         </div>
         <div class="quick-actions">
-          @if (can(['ADMIN'])) {
-            <button mat-stroked-button type="button" class="quick-action" (click)="agregarProducto()">
-              <mat-icon>add</mat-icon>
-              <span>Agregar producto</span>
-            </button>
-          }
-          @if (can(['ADMIN','ALMACENISTA'])) {
-            <button mat-stroked-button type="button" class="quick-action" (click)="registrarEntrada()">
-              <mat-icon>inventory</mat-icon>
-              <span>Registrar entrada</span>
-            </button>
-          }
-          @if (can(['ADMIN','GERENTE'])) {
-            <button mat-stroked-button type="button" class="quick-action" (click)="crearOrden()">
-              <mat-icon>receipt_long</mat-icon>
-              <span>Crear orden</span>
-            </button>
-          }
+          <button
+            *ngIf="can(['ADMIN'])"
+            type="button"
+            class="quick-action"
+            (click)="agregarProducto()">
+            <span class="quick-action__icon"><mat-icon>add</mat-icon></span>
+            <span class="quick-action__body">
+              <strong>Agregar producto</strong>
+              <small>Crea un SKU nuevo con stock minimo.</small>
+            </span>
+          </button>
+          <button
+            *ngIf="can(['ADMIN','ALMACENISTA'])"
+            type="button"
+            class="quick-action"
+            (click)="registrarEntrada()">
+            <span class="quick-action__icon"><mat-icon>inventory</mat-icon></span>
+            <span class="quick-action__body">
+              <strong>Registrar entrada</strong>
+              <small>Recibe mercancia y suma al inventario.</small>
+            </span>
+          </button>
+          <button
+            *ngIf="can(['ADMIN','GERENTE'])"
+            type="button"
+            class="quick-action"
+            (click)="crearOrden()">
+            <span class="quick-action__icon"><mat-icon>receipt_long</mat-icon></span>
+            <span class="quick-action__body">
+              <strong>Crear orden</strong>
+              <small>Inicia una compra a proveedor.</small>
+            </span>
+          </button>
         </div>
       </section>
     </section>
@@ -199,7 +236,7 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
   styles: [`
     .dashboard-section {
       display: grid;
-      gap: 12px;
+      gap: var(--app-space-3);
     }
 
     .section-heading {
@@ -209,46 +246,182 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
       min-height: 24px;
     }
 
+    .metric-card {
+      display: grid;
+      gap: var(--app-space-3);
+    }
+
+    .metric-info { display: grid; gap: var(--app-space-1); }
+
+    .metric-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--app-radius-3);
+      color: var(--app-brand-strong);
+      background: var(--app-surface-muted);
+    }
+
+    .metric-icon--stock { color: var(--app-brand-strong); background: rgba(0, 121, 107, 0.12); }
+    .metric-icon--sales { color: var(--app-accent); background: rgba(47, 111, 171, 0.14); }
+    .metric-icon--orders { color: var(--app-warning); background: rgba(181, 106, 20, 0.14); }
+    .metric-icon--alerts { color: var(--app-danger); background: rgba(176, 56, 50, 0.14); }
+
+    body.theme-dark .metric-icon--stock { background: rgba(65, 199, 181, 0.18); }
+    body.theme-dark .metric-icon--sales { background: rgba(122, 167, 223, 0.18); }
+    body.theme-dark .metric-icon--orders { background: rgba(225, 168, 75, 0.18); }
+    body.theme-dark .metric-icon--alerts { background: rgba(224, 107, 101, 0.20); }
+
+    .metric-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--app-space-2);
+    }
+
+    .metric-trend {
+      padding: 2px 8px;
+      border-radius: var(--app-radius-pill);
+      background: var(--app-surface-muted);
+      color: var(--app-muted-strong);
+      font-size: var(--app-font-12);
+      font-weight: var(--app-weight-semibold);
+    }
+
     .dashboard-charts,
     .dashboard-tables {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
+      gap: var(--app-space-5);
       align-items: stretch;
     }
 
     .dashboard-chart {
       display: grid;
-      gap: 16px;
+      gap: var(--app-space-4);
       min-height: 390px;
     }
 
     .dashboard-chart canvas {
-      min-height: 290px;
+      min-height: 280px;
     }
 
-    .hidden-chart {
-      display: none !important;
+    .doughnut-layout {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px);
+      gap: var(--app-space-4);
+      align-items: center;
     }
+
+    .doughnut-canvas {
+      position: relative;
+      min-height: 240px;
+    }
+
+    .doughnut-legend {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: var(--app-space-3);
+    }
+
+    .doughnut-legend li {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--app-space-3);
+      font-size: var(--app-font-14);
+      color: var(--app-text);
+    }
+
+    .doughnut-legend small {
+      color: var(--app-muted);
+      margin-left: 2px;
+      font-size: var(--app-font-12);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--app-muted);
+    }
+
+    .legend-dot--success { background: var(--app-success); }
+    .legend-dot--warn { background: var(--app-warning); }
+    .legend-dot--primary { background: var(--app-accent); }
+
+    .legend-value {
+      font-variant-numeric: tabular-nums;
+      color: var(--app-heading);
+      font-weight: var(--app-weight-semibold);
+    }
+
+    .doughnut-empty {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--app-muted);
+      text-align: center;
+    }
+
+    .hidden-chart { display: none !important; }
 
     .quick-actions {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
+      gap: var(--app-space-4);
     }
 
     .quick-action {
-      min-height: 64px;
-      justify-content: flex-start;
-      padding: 0 18px;
-      border-color: var(--app-border-strong);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: var(--app-space-4);
+      padding: var(--app-space-4) var(--app-space-5);
+      min-height: 88px;
+      text-align: left;
+      border: 1px solid var(--app-border-strong);
+      border-radius: var(--app-radius-3);
       background: var(--app-surface);
-      box-shadow: var(--app-shadow);
+      color: var(--app-text);
+      box-shadow: var(--app-elevation-2);
+      cursor: pointer;
+      transition: transform var(--app-dur-fast) var(--app-ease-out),
+                  box-shadow var(--app-dur-fast) var(--app-ease-out),
+                  border-color var(--app-dur-fast) var(--app-ease-out);
     }
 
-    .quick-action mat-icon {
-      margin-right: 10px;
+    .quick-action:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--app-elevation-3);
+      border-color: var(--app-brand);
+    }
+
+    .quick-action__icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--app-radius-3);
+      background: var(--app-surface-muted);
       color: var(--app-brand-strong);
+    }
+
+    .quick-action__body {
+      display: grid;
+      gap: 2px;
+    }
+
+    .quick-action__body strong {
+      color: var(--app-heading);
+      font-weight: var(--app-weight-bold);
+    }
+
+    .quick-action__body small {
+      color: var(--app-muted);
+      font-size: var(--app-font-12);
     }
 
     .compact {
@@ -261,6 +434,10 @@ import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.c
       .quick-actions {
         grid-template-columns: 1fr;
       }
+
+      .doughnut-layout {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
@@ -269,6 +446,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('salesChart') salesChartCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = false;
+  loaded = false;
   kpis?: DashboardKpi;
   stockTotalResumen = 0;
   ventasTotalResumen = 0;
@@ -278,8 +456,33 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   movimientosPorTipo: MovimientoTipoResumen[] = [];
   actividadReciente: MovimientoInventario[] = [];
   topSales: { producto: string; cantidad: number }[] = [];
-  criticosCols = ['codigo', 'nombre', 'stock', 'accion'];
-  actividadCols = ['fecha', 'producto', 'tipo', 'cantidad'];
+
+  readonly criticosColumns: TableColumn<Producto>[] = [
+    { key: 'codigo', header: 'Codigo' },
+    { key: 'nombre', header: 'Producto' },
+    { key: 'stock', header: 'Stock', value: row => row.cantidadStock },
+    { key: 'accion', header: 'Accion', align: 'end' }
+  ];
+
+  readonly actividadColumns: TableColumn<MovimientoInventario>[] = [
+    { key: 'fecha', header: 'Fecha', value: row => row.fecha },
+    { key: 'producto', header: 'Producto', value: row => row.producto.nombre },
+    { key: 'tipo', header: 'Tipo', value: row => row.tipoMovimiento },
+    { key: 'cantidad', header: 'Cant.', align: 'end', value: row => row.cantidad }
+  ];
+
+  readonly criticosEmpty = {
+    icon: 'task_alt',
+    title: 'Inventario estable',
+    message: 'No hay productos por debajo del minimo.'
+  };
+
+  readonly actividadEmpty = {
+    icon: 'history',
+    title: 'Sin actividad reciente',
+    message: 'Las entradas, salidas y ajustes apareceran aqui.'
+  };
+
   private movementsChart?: Chart;
   private salesChart?: Chart;
   private viewReady = false;
@@ -288,7 +491,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private api: ApiService,
     private auth: AuthService,
     private dialog: MatDialog,
-    private snack: MatSnackBar,
+    private notify: NotifyService,
     private theme: ThemeService,
     private router: Router
   ) {
@@ -298,22 +501,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  get kpiCards() {
+  get kpiCards(): KpiCard[] {
     const k = this.kpis ?? { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
     return [
-      { label: 'Stock', value: this.stockTotal, icon: 'inventory_2', note: `${k.totalProductos} referencias activas en catalogo.` },
-      { label: 'Ventas', value: this.ventasTotal, icon: 'point_of_sale', note: 'Salidas registradas desde movimientos.' },
-      { label: 'Ordenes', value: k.ordenesPendientes, icon: 'pending_actions', note: 'Ordenes abiertas o pendientes de recepcion.' },
-      { label: 'Alertas', value: k.stockBajo, icon: 'warning', note: 'Productos por debajo del minimo definido.' }
+      { label: 'Stock', value: this.stockTotalResumen, icon: 'inventory_2', tone: 'stock', note: `${k.totalProductos} referencias activas en catalogo.` },
+      { label: 'Ventas', value: this.ventasTotalResumen, icon: 'point_of_sale', tone: 'sales', note: 'Salidas registradas desde movimientos.' },
+      { label: 'Ordenes', value: k.ordenesPendientes, icon: 'pending_actions', tone: 'orders', note: 'Ordenes abiertas o pendientes de recepcion.' },
+      { label: 'Alertas', value: k.stockBajo, icon: 'warning', tone: 'alerts', note: 'Productos por debajo del minimo definido.' }
     ];
-  }
-
-  get stockTotal() {
-    return this.stockTotalResumen;
-  }
-
-  get ventasTotal() {
-    return this.ventasTotalResumen;
   }
 
   ngOnInit() {
@@ -351,11 +546,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.actividadReciente = resumen.actividadReciente;
         this.topSales = resumen.topVentas.map(item => ({ producto: item.producto, cantidad: item.cantidad }));
         this.loading = false;
+        this.loaded = true;
         this.renderCharts();
       },
       error: () => {
         this.loading = false;
-        this.snack.open('No se pudo cargar el dashboard', 'Cerrar', { duration: 3000 });
+        this.notify.error('No se pudo cargar el dashboard');
       }
     });
   }
@@ -365,7 +561,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ref.afterClosed().subscribe((result?: Partial<Producto>) => {
       if (!result) return;
       this.api.crearProducto(result).subscribe(() => {
-        this.snack.open('Producto guardado', 'Cerrar', { duration: 2500 });
+        this.notify.success('Producto guardado');
         this.load();
       });
     });
@@ -373,7 +569,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   registrarEntrada(producto?: Producto) {
     if (!this.productos.length) {
-      this.snack.open('Primero registra un producto para poder hacer entradas', 'Cerrar', { duration: 3000 });
+      this.notify.warning('Primero registra un producto para poder hacer entradas');
       return;
     }
 
@@ -381,7 +577,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ref.afterClosed().subscribe((result?: StockMovementDialogResult) => {
       if (!result) return;
       this.api.registrarEntrada(result).subscribe(() => {
-        this.snack.open('Entrada registrada', 'Cerrar', { duration: 2500 });
+        this.notify.success('Entrada registrada');
         this.load();
       });
     });
@@ -395,20 +591,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (tipo === 'ENTRADA') return 'success';
     if (tipo === 'SALIDA') return 'warn';
     return 'primary';
-  }
-
-  private buildTopSales(movimientos: MovimientoInventario[]) {
-    const totals = new Map<string, number>();
-    movimientos
-      .filter(movimiento => movimiento.tipoMovimiento === 'SALIDA')
-      .forEach(movimiento => {
-        totals.set(movimiento.producto.nombre, (totals.get(movimiento.producto.nombre) ?? 0) + Math.abs(movimiento.cantidad));
-      });
-
-    return [...totals.entries()]
-      .map(([producto, cantidad]) => ({ producto, cantidad }))
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 5);
   }
 
   private renderCharts() {
@@ -435,14 +617,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           data: values,
           backgroundColor: [
             this.cssVar('--app-success', '#2f855a'),
-            this.cssVar('--app-accent', '#2f6fab'),
-            this.cssVar('--app-warning', '#c47a1c')
+            this.cssVar('--app-warning', '#c47a1c'),
+            this.cssVar('--app-accent', '#2f6fab')
           ],
           borderColor: this.cssVar('--app-surface', '#ffffff'),
           borderWidth: 3
         }]
       },
-      options: this.chartOptions()
+      options: {
+        ...this.chartOptions(),
+        cutout: '62%',
+        plugins: {
+          ...this.chartOptions().plugins,
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx: TooltipItem<'doughnut'>) => `${ctx.label}: ${ctx.parsed} unidades`
+            }
+          }
+        }
+      }
     });
   }
 
@@ -466,6 +660,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       options: {
         ...this.chartOptions(),
+        plugins: {
+          ...this.chartOptions().plugins,
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx: TooltipItem<'bar'>) => {
+                const value = Number(ctx.parsed.y ?? 0);
+                return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
+              }
+            }
+          }
+        },
         scales: {
           x: {
             ticks: { color: this.cssVar('--app-muted', '#667775') },
@@ -487,9 +693,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: {
-            color: this.cssVar('--app-muted', '#667775')
-          }
+          labels: { color: this.cssVar('--app-muted', '#667775') }
         }
       }
     };
