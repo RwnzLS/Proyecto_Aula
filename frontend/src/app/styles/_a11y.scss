@@ -1,0 +1,68 @@
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus-ring);
+  border-radius: var(--app-radius-2);
+  transition: box-shadow var(--app-dur-fast) var(--app-ease-out);
+}
+
+.mat-mdc-button:focus-visible,
+.mat-mdc-raised-button:focus-visible,
+.mat-mdc-outlined-button:focus-visible,
+.mat-mdc-stroked-button:focus-visible,
+.mat-mdc-icon-button:focus-visible,
+.mat-mdc-fab:focus-visible,
+.mat-mdc-mini-fab:focus-visible {
+  box-shadow: var(--app-focus-ring) !important;
+}
+
+.mat-mdc-button.danger:focus-visible,
+.mat-mdc-raised-button.danger:focus-visible,
+.mat-mdc-outlined-button.danger:focus-visible {
+  box-shadow: var(--app-focus-ring-danger) !important;
+}
+
+a:focus-visible {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 12px;
+  background: var(--app-surface);
+  color: var(--app-heading);
+  padding: 8px 14px;
+  border-radius: var(--app-radius-3);
+  border: 1px solid var(--app-border-strong);
+  box-shadow: var(--app-elevation-2);
+  z-index: var(--app-z-toast);
+  transition: top var(--app-dur-base) var(--app-ease-out);
+
+  &:focus {
+    top: 12px;
+    outline: none;
+  }
+}
