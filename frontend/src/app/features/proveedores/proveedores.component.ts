@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,29 +7,31 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
+import { PageEvent } from '@angular/material/paginator';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Page, Proveedor, Rol } from '../../core/models';
+import { NotifyService } from '../../shared/notify.service';
+import {
+  CellDefDirective,
+  DataTableComponent,
+  TableColumn
+} from '../../shared/data-table.component';
 import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component';
 
 @Component({
   selector: 'app-proveedores',
   standalone: true,
   imports: [
+    CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatPaginatorModule,
-    MatProgressBarModule,
-    MatSnackBarModule,
-    MatTableModule
+    DataTableComponent,
+    CellDefDirective
   ],
   template: `
     <section class="module-page">
@@ -64,10 +67,6 @@ import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component'
         </div>
       </div>
 
-      @if (loading) {
-        <mat-progress-bar mode="indeterminate" />
-      }
-
       <div class="data-panel">
         <div class="panel-head">
           <div class="panel-title">
@@ -76,32 +75,23 @@ import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component'
           </div>
           <span class="count-pill">{{ proveedores.length }}</span>
         </div>
-        @if (proveedores.length) {
-          <div class="table-wrap">
-            <table mat-table [dataSource]="proveedores">
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let p">{{ p.nombre }}</td></ng-container>
-              <ng-container matColumnDef="rucNit"><th mat-header-cell *matHeaderCellDef>RUC/NIT</th><td mat-cell *matCellDef="let p">{{ p.rucNit }}</td></ng-container>
-              <ng-container matColumnDef="email"><th mat-header-cell *matHeaderCellDef>Email</th><td mat-cell *matCellDef="let p">{{ p.email }}</td></ng-container>
-              <ng-container matColumnDef="acciones">
-                <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                <td mat-cell *matCellDef="let p">
-                  @if (can(['ADMIN'])) {
-                    <button mat-icon-button title="Editar" (click)="abrirProveedor(p)"><mat-icon>edit</mat-icon></button>
-                  }
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="proveedorCols"></tr>
-              <tr mat-row *matRowDef="let row; columns: proveedorCols;"></tr>
-            </table>
-            <mat-paginator [length]="proveedoresPage?.totalElements ?? 0" [pageIndex]="pageIndex" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="onPage($event)" />
-          </div>
-        } @else {
-          <div class="empty-state">
-            <mat-icon>business</mat-icon>
-            <h3>No hay proveedores para mostrar</h3>
-            <p>Ajusta la busqueda o crea un proveedor.</p>
-          </div>
-        }
+        <app-data-table
+          [columns]="columns"
+          [rows]="proveedores"
+          [loading]="loading"
+          [length]="proveedoresPage?.totalElements ?? 0"
+          [pageIndex]="pageIndex"
+          [pageSize]="pageSize"
+          [emptyState]="emptyState"
+          (page)="onPage($event)">
+          <ng-template [appCellDef]="'acciones'" let-row>
+            <div class="actions">
+              @if (can(['ADMIN'])) {
+                <button mat-icon-button title="Editar" (click)="abrirProveedor(row)"><mat-icon>edit</mat-icon></button>
+              }
+            </div>
+          </ng-template>
+        </app-data-table>
       </div>
     </section>
   `
@@ -112,10 +102,28 @@ export class ProveedoresComponent implements OnInit {
   proveedoresPage?: Page<Proveedor>;
   pageIndex = 0;
   pageSize = 20;
-  proveedorCols = ['nombre', 'rucNit', 'email', 'acciones'];
   filtro = this.fb.group({ nombre: [''] });
 
-  constructor(private api: ApiService, private auth: AuthService, private fb: FormBuilder, private dialog: MatDialog, private snack: MatSnackBar) {}
+  readonly columns: TableColumn<Proveedor>[] = [
+    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'rucNit', header: 'RUC/NIT', sortable: true },
+    { key: 'email', header: 'Email', sortable: true },
+    { key: 'acciones', header: 'Acciones', align: 'end' }
+  ];
+
+  readonly emptyState = {
+    icon: 'business',
+    title: 'No hay proveedores para mostrar',
+    message: 'Ajusta la busqueda o crea un proveedor.'
+  };
+
+  constructor(
+    private api: ApiService,
+    private auth: AuthService,
+    private fb: FormBuilder,
+    private dialog: MatDialog,
+    private notify: NotifyService
+  ) {}
 
   ngOnInit() {
     this.loadProveedores();
@@ -160,7 +168,7 @@ export class ProveedoresComponent implements OnInit {
     ref.afterClosed().subscribe((result?: Partial<Proveedor>) => {
       if (!result) return;
       this.api.guardarProveedor(result, proveedor?.id).subscribe(() => {
-        this.snack.open('Proveedor guardado', 'Cerrar', { duration: 2500 });
+        this.notify.success('Proveedor guardado');
         this.loadProveedores();
         this.api.dashboard().subscribe();
       });

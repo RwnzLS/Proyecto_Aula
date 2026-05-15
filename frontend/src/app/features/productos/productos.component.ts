@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,14 +8,17 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Page, Producto, Rol } from '../../core/models';
+import { NotifyService } from '../../shared/notify.service';
+import {
+  CellDefDirective,
+  DataTableComponent,
+  TableColumn
+} from '../../shared/data-table.component';
 import { AjusteDialogComponent, AjusteStockDialogResult } from './ajuste-dialog.component';
 import { ProductoFormDialogComponent } from './producto-form-dialog.component';
 
@@ -22,6 +26,7 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
   selector: 'app-productos',
   standalone: true,
   imports: [
+    CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatChipsModule,
@@ -29,11 +34,9 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatPaginatorModule,
-    MatProgressBarModule,
     MatSelectModule,
-    MatSnackBarModule,
-    MatTableModule
+    DataTableComponent,
+    CellDefDirective
   ],
   template: `
     <section class="module-page">
@@ -78,10 +81,6 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
         </div>
       </div>
 
-      @if (loading) {
-        <mat-progress-bar mode="indeterminate" />
-      }
-
       <div class="data-panel">
         <div class="panel-head">
           <div class="panel-title">
@@ -90,43 +89,31 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
           </div>
           <span class="count-pill">{{ productos.length }}</span>
         </div>
-        @if (productos.length) {
-          <div class="table-wrap">
-            <table mat-table [dataSource]="productos">
-              <ng-container matColumnDef="codigo"><th mat-header-cell *matHeaderCellDef>Codigo</th><td mat-cell *matCellDef="let p">{{ p.codigo }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let p">{{ p.nombre }}</td></ng-container>
-              <ng-container matColumnDef="categoria"><th mat-header-cell *matHeaderCellDef>Categoria</th><td mat-cell *matCellDef="let p">{{ p.categoria }}</td></ng-container>
-              <ng-container matColumnDef="stock">
-                <th mat-header-cell *matHeaderCellDef>Stock</th>
-                <td mat-cell *matCellDef="let p">
-                  <mat-chip [class]="p.cantidadStock <= p.stockMinimo ? 'chip-danger' : 'chip-ok'">
-                    {{ p.cantidadStock }} / {{ p.stockMinimo }}
-                  </mat-chip>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="acciones">
-                <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                <td mat-cell *matCellDef="let p" class="actions">
-                  @if (can(['ADMIN'])) {
-                    <button mat-icon-button title="Editar" (click)="abrirProducto(p)"><mat-icon>edit</mat-icon></button>
-                  }
-                  @if (can(['ADMIN','ALMACENISTA'])) {
-                    <button mat-icon-button title="Ajustar" (click)="ajustar(p)"><mat-icon>inventory</mat-icon></button>
-                  }
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="productoCols"></tr>
-              <tr mat-row *matRowDef="let row; columns: productoCols;"></tr>
-            </table>
-            <mat-paginator [length]="productosPage?.totalElements ?? 0" [pageIndex]="pageIndex" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="onPage($event)" />
-          </div>
-        } @else {
-          <div class="empty-state">
-            <mat-icon>inventory_2</mat-icon>
-            <h3>No hay productos para mostrar</h3>
-            <p>Ajusta los filtros o registra un nuevo producto.</p>
-          </div>
-        }
+        <app-data-table
+          [columns]="columns"
+          [rows]="productos"
+          [loading]="loading"
+          [length]="productosPage?.totalElements ?? 0"
+          [pageIndex]="pageIndex"
+          [pageSize]="pageSize"
+          [emptyState]="emptyState"
+          (page)="onPage($event)">
+          <ng-template [appCellDef]="'stock'" let-row>
+            <mat-chip [class]="row.cantidadStock <= row.stockMinimo ? 'chip-danger' : 'chip-ok'">
+              {{ row.cantidadStock }} / {{ row.stockMinimo }}
+            </mat-chip>
+          </ng-template>
+          <ng-template [appCellDef]="'acciones'" let-row>
+            <div class="actions">
+              @if (can(['ADMIN'])) {
+                <button mat-icon-button title="Editar" (click)="abrirProducto(row)"><mat-icon>edit</mat-icon></button>
+              }
+              @if (can(['ADMIN','ALMACENISTA'])) {
+                <button mat-icon-button title="Ajustar" (click)="ajustar(row)"><mat-icon>inventory</mat-icon></button>
+              }
+            </div>
+          </ng-template>
+        </app-data-table>
       </div>
     </section>
   `
@@ -137,10 +124,29 @@ export class ProductosComponent implements OnInit {
   productosPage?: Page<Producto>;
   pageIndex = 0;
   pageSize = 20;
-  productoCols = ['codigo', 'nombre', 'categoria', 'stock', 'acciones'];
   productoFiltro = this.fb.group({ nombre: [''], categoria: [''], stockBajo: [null as boolean | null] });
 
-  constructor(private api: ApiService, private auth: AuthService, private fb: FormBuilder, private dialog: MatDialog, private snack: MatSnackBar) {}
+  readonly columns: TableColumn<Producto>[] = [
+    { key: 'codigo', header: 'Codigo', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'categoria', header: 'Categoria', sortable: true },
+    { key: 'stock', header: 'Stock', sortable: true, value: row => row.cantidadStock },
+    { key: 'acciones', header: 'Acciones', align: 'end' }
+  ];
+
+  readonly emptyState = {
+    icon: 'inventory_2',
+    title: 'No hay productos para mostrar',
+    message: 'Ajusta los filtros o registra un nuevo producto.'
+  };
+
+  constructor(
+    private api: ApiService,
+    private auth: AuthService,
+    private fb: FormBuilder,
+    private dialog: MatDialog,
+    private notify: NotifyService
+  ) {}
 
   ngOnInit() {
     this.loadProductos();
@@ -186,7 +192,7 @@ export class ProductosComponent implements OnInit {
       if (!result) return;
       const call = producto ? this.api.actualizarProducto(producto.id, result) : this.api.crearProducto(result);
       call.subscribe(() => {
-        this.snack.open('Producto guardado', 'Cerrar', { duration: 2500 });
+        this.notify.success('Producto guardado');
         this.loadProductos();
       });
     });
@@ -197,7 +203,7 @@ export class ProductosComponent implements OnInit {
     ref.afterClosed().subscribe((result?: AjusteStockDialogResult) => {
       if (!result) return;
       this.api.ajustarStock(producto.id, result.cantidad, result.motivo).subscribe(() => {
-        this.snack.open('Stock ajustado', 'Cerrar', { duration: 2500 });
+        this.notify.success('Stock ajustado');
         this.loadProductos();
       });
     });
