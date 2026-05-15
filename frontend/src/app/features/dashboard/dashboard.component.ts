@@ -12,8 +12,8 @@ import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { DashboardKpi, MovimientoInventario, MovimientoTipoResumen, Producto, Rol } from '../../core/models';
+import { Router } from '@angular/router';
 import { ThemeService } from '../../core/theme.service';
-import { WorkspaceNavigationService } from '../../core/workspace-navigation.service';
 import { StockMovementDialogComponent, StockMovementDialogResult } from '../movimientos/stock-movement-dialog.component';
 import { ProductoFormDialogComponent } from '../productos/producto-form-dialog.component';
 
@@ -290,7 +290,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private dialog: MatDialog,
     private snack: MatSnackBar,
     private theme: ThemeService,
-    private navigation: WorkspaceNavigationService
+    private router: Router
   ) {
     effect(() => {
       this.theme.isDark();
@@ -388,7 +388,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   crearOrden() {
-    this.navigation.go(4);
+    this.router.navigate(['/ordenes']);
   }
 
   chipMovimiento(tipo: string) {
