@@ -349,6 +349,48 @@ canvas { max-height: 320px; }
   font-variant-numeric: tabular-nums;
 }
 
+.app-notify {
+  .mdc-snackbar__surface {
+    border-radius: var(--app-radius-3) !important;
+    box-shadow: var(--app-elevation-3) !important;
+    border-left: 4px solid transparent;
+  }
+
+  .mdc-button__label,
+  .mat-mdc-snack-bar-action .mat-mdc-button {
+    color: inherit !important;
+    font-weight: var(--app-weight-bold);
+  }
+}
+
+.app-notify.notify-success .mdc-snackbar__surface {
+  background: var(--app-success) !important;
+  color: #ffffff !important;
+  border-left-color: rgba(255, 255, 255, 0.45);
+}
+
+.app-notify.notify-info .mdc-snackbar__surface {
+  background: var(--app-accent) !important;
+  color: #ffffff !important;
+  border-left-color: rgba(255, 255, 255, 0.45);
+}
+
+.app-notify.notify-warning .mdc-snackbar__surface {
+  background: var(--app-warning) !important;
+  color: #ffffff !important;
+  border-left-color: rgba(255, 255, 255, 0.45);
+}
+
+.app-notify.notify-error .mdc-snackbar__surface {
+  background: var(--app-danger) !important;
+  color: #ffffff !important;
+  border-left-color: rgba(255, 255, 255, 0.55);
+}
+
+.app-notify .mdc-snackbar__label {
+  color: inherit !important;
+}
+
 body.theme-dark {
   .mat-mdc-card,
   .mat-mdc-dialog-container .mdc-dialog__surface,
