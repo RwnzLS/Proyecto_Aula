@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -42,7 +42,7 @@ export interface AjusteStockDialogResult {
 })
 export class AjusteDialogComponent {
   form = this.fb.nonNullable.group({
-    cantidad: [0, Validators.required],
+    cantidad: [0, [Validators.required, (control: AbstractControl) => Number(control.value) === 0 ? { zero: true } : null]],
     motivo: ['Ajuste manual', Validators.required]
   });
 
@@ -54,6 +54,7 @@ export class AjusteDialogComponent {
 
   confirmar() {
     const value = this.form.getRawValue();
+    if (Number(value.cantidad) === 0) return;
     this.dialogRef.close({ cantidad: Number(value.cantidad) || 0, motivo: value.motivo });
   }
 }

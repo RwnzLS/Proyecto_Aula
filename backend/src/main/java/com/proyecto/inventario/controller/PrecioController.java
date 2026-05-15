@@ -29,6 +29,12 @@ public class PrecioController {
     return ResponseEntity.ok(service.historial(productoId, proveedorId));
   }
 
+  @GetMapping("/ultimo")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
+  public ResponseEntity<?> ultimo(@RequestParam Long productoId, @RequestParam Long proveedorId) {
+    return ResponseEntity.ok(service.ultimo(productoId, proveedorId));
+  }
+
   @PostMapping
   @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
   public ResponseEntity<?> create(@Valid @RequestBody PrecioRequest request) {

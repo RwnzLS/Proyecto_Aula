@@ -15,10 +15,12 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   return next(req).pipe(catchError((error: HttpErrorResponse) => {
-    if (error.status === 401 || error.status === 403) {
-      snack.open('Sesion expirada o sin permisos', 'Cerrar', { duration: 3500 });
+    if (error.status === 401) {
+      snack.open('Sesion expirada', 'Cerrar', { duration: 3500 });
       auth.logout();
       router.navigateByUrl('/login');
+    } else if (error.status === 403) {
+      snack.open('No tienes permisos para esta accion', 'Cerrar', { duration: 3500 });
     } else if (error.status === 0) {
       snack.open('API no disponible. Revisa que el backend este corriendo en localhost:8080', 'Cerrar', { duration: 4500 });
     } else {

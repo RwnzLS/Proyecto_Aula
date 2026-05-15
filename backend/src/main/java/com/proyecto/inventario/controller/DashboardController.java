@@ -21,4 +21,10 @@ public class DashboardController {
   public ResponseEntity<?> kpis() {
     return ResponseEntity.ok(service.kpis());
   }
+
+  @GetMapping("/resumen")
+  @PreAuthorize("hasAnyRole('ADMIN','GERENTE','ALMACENISTA')")
+  public ResponseEntity<?> resumen() {
+    return ResponseEntity.ok(service.resumen());
+  }
 }

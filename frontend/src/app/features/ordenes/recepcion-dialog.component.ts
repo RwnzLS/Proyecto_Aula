@@ -23,7 +23,7 @@ export interface RecepcionItem {
           <ng-container matColumnDef="producto"><th mat-header-cell *matHeaderCellDef>Producto</th><td mat-cell *matCellDef="let d">{{ d.producto.nombre }}</td></ng-container>
           <ng-container matColumnDef="solicitada"><th mat-header-cell *matHeaderCellDef>Solicitada</th><td mat-cell *matCellDef="let d">{{ d.cantidadSolicitada }}</td></ng-container>
           <ng-container matColumnDef="recibida"><th mat-header-cell *matHeaderCellDef>Recibida</th><td mat-cell *matCellDef="let d">{{ d.cantidadRecibida }}</td></ng-container>
-          <ng-container matColumnDef="nueva"><th mat-header-cell *matHeaderCellDef>Nueva</th><td mat-cell *matCellDef="let d"><input matInput type="number" min="0" [value]="cantidad(d.id)" (input)="setCantidad(d.id, $event)"></td></ng-container>
+          <ng-container matColumnDef="nueva"><th mat-header-cell *matHeaderCellDef>Nueva</th><td mat-cell *matCellDef="let d"><input matInput type="number" min="0" [max]="pendiente(d)" [value]="cantidad(d.id)" (input)="setCantidad(d, $event)"></td></ng-container>
           <tr mat-header-row *matHeaderRowDef="cols"></tr>
           <tr mat-row *matRowDef="let row; columns: cols;"></tr>
         </table>
@@ -51,8 +51,13 @@ export class RecepcionDialogComponent {
     return this.cantidades[id] ?? 0;
   }
 
-  setCantidad(id: number, event: Event) {
-    this.cantidades[id] = Number((event.target as HTMLInputElement).value);
+  pendiente(detalle: OrdenCompra['detalles'][number]) {
+    return Math.max(0, detalle.cantidadSolicitada - detalle.cantidadRecibida);
+  }
+
+  setCantidad(detalle: OrdenCompra['detalles'][number], event: Event) {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.cantidades[detalle.id] = Math.min(Math.max(0, value || 0), this.pendiente(detalle));
   }
 
   confirmar() {

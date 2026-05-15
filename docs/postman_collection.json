@@ -26,7 +26,7 @@
       "request": {
         "method": "POST",
         "header": [{"key": "Content-Type", "value": "application/json"}],
-        "url": "{{baseUrl}}/auth/register",
+        "url": "{{baseUrl}}/usuarios",
         "body": {"mode": "raw", "raw": "{\"nombre\":\"Gerente\",\"email\":\"gerente@inventario.local\",\"password\":\"password\",\"rol\":\"GERENTE\",\"activo\":true}"}
       }
     },
@@ -61,6 +61,7 @@
       }
     },
     {"name": "Historial Precios", "request": {"method": "GET", "url": "{{baseUrl}}/precios/historial?productoId=1&proveedorId=1"}},
+    {"name": "Ultimo Precio", "request": {"method": "GET", "url": "{{baseUrl}}/precios/ultimo?productoId=1&proveedorId=1"}},
     {
       "name": "Registrar Precio",
       "request": {
@@ -92,6 +93,7 @@
     },
     {"name": "Movimientos", "request": {"method": "GET", "url": "{{baseUrl}}/movimientos?page=0&size=10"}},
     {"name": "Dashboard", "request": {"method": "GET", "url": "{{baseUrl}}/dashboard"}},
+    {"name": "Dashboard Resumen", "request": {"method": "GET", "url": "{{baseUrl}}/dashboard/resumen"}},
     {"name": "Usuarios", "request": {"method": "GET", "url": "{{baseUrl}}/usuarios?page=0&size=10"}}
   ]
 }

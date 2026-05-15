@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { DashboardKpi, EstadoOrden, MovimientoInventario, OrdenCompra, Page, PrecioProveedor, Producto, Proveedor, TipoMovimiento, UsuarioResponse } from './models';
+import { DashboardKpi, DashboardResumen, EstadoOrden, MovimientoInventario, OrdenCompra, Page, PrecioProveedor, Producto, Proveedor, TipoMovimiento, UsuarioResponse } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -9,6 +9,7 @@ export class ApiService {
   constructor(private http: HttpClient) {}
 
   dashboard() { return this.http.get<DashboardKpi>(`${this.api}/dashboard`); }
+  dashboardResumen() { return this.http.get<DashboardResumen>(`${this.api}/dashboard/resumen`); }
   productos(filters: { nombre?: string | null; categoria?: string | null; stockBajo?: boolean | null; page?: number; size?: number } = {}) {
     return this.http.get<Page<Producto>>(`${this.api}/productos`, { params: this.params(filters) });
   }
@@ -24,6 +25,7 @@ export class ApiService {
   guardarProveedor(body: Partial<Proveedor>, id?: number) { return id ? this.http.put<Proveedor>(`${this.api}/proveedores/${id}`, body) : this.http.post<Proveedor>(`${this.api}/proveedores`, body); }
 
   historialPrecios(filters: { productoId?: number; proveedorId?: number } = {}) { return this.http.get<PrecioProveedor[]>(`${this.api}/precios/historial`, { params: this.params(filters) }); }
+  ultimoPrecio(filters: { productoId: number; proveedorId: number }) { return this.http.get<PrecioProveedor>(`${this.api}/precios/ultimo`, { params: this.params(filters) }); }
   registrarPrecio(body: { proveedorId: number; productoId: number; precioUnitario: number; moneda: string }) { return this.http.post<PrecioProveedor>(`${this.api}/precios`, body); }
 
   ordenes(filters: { estado?: EstadoOrden; proveedorId?: number; page?: number; size?: number } = {}) { return this.http.get<Page<OrdenCompra>>(`${this.api}/ordenes`, { params: this.params(filters) }); }

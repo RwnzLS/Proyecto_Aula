@@ -20,10 +20,10 @@ public class ProveedorService {
 
   @Transactional(readOnly = true)
   public Page<Proveedor> list(String nombre, Pageable pageable) {
-    Specification<Proveedor> spec = (root, query, cb) ->
-      nombre == null || nombre.isBlank()
-        ? cb.conjunction()
-        : cb.like(cb.lower(root.get("nombre")), "%" + nombre.toLowerCase() + "%");
+    Specification<Proveedor> spec = (root, query, cb) -> cb.isTrue(root.get("activo"));
+    if (nombre != null && !nombre.isBlank()) {
+      spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("nombre")), "%" + nombre.toLowerCase() + "%"));
+    }
     return proveedores.findAll(spec, pageable);
   }
 

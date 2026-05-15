@@ -4,6 +4,7 @@ import com.proyecto.inventario.dto.Dtos.AjusteStockRequest;
 import com.proyecto.inventario.dto.Dtos.ProductoRequest;
 import com.proyecto.inventario.entity.MovimientoInventario;
 import com.proyecto.inventario.entity.Producto;
+import com.proyecto.inventario.exception.BusinessException;
 import com.proyecto.inventario.model.Rol;
 import com.proyecto.inventario.model.TipoMovimiento;
 import com.proyecto.inventario.exception.NotFoundException;
@@ -40,7 +41,7 @@ public class ProductoService {
 
   @Transactional(readOnly = true)
   public Page<Producto> list(String categoria, String nombre, Boolean stockBajo, Pageable pageable) {
-    Specification<Producto> spec = (root, query, cb) -> cb.conjunction();
+    Specification<Producto> spec = (root, query, cb) -> cb.isTrue(root.get("activo"));
     if (categoria != null && !categoria.isBlank()) spec = spec.and((r, q, cb) -> cb.equal(r.get("categoria"), categoria));
     if (nombre != null && !nombre.isBlank()) spec = spec.and((r, q, cb) -> cb.like(cb.lower(r.get("nombre")), "%" + nombre.toLowerCase() + "%"));
     if (Boolean.TRUE.equals(stockBajo)) spec = spec.and((r, q, cb) -> cb.lessThanOrEqualTo(r.get("cantidadStock"), r.get("stockMinimo")));
@@ -49,18 +50,21 @@ public class ProductoService {
 
   @Transactional(readOnly = true)
   public List<Producto> stockBajo() {
-    return productos.findAll((root, query, cb) -> cb.lessThanOrEqualTo(root.get("cantidadStock"), root.get("stockMinimo")));
+    return productos.findAll((root, query, cb) -> cb.and(
+      cb.isTrue(root.get("activo")),
+      cb.lessThanOrEqualTo(root.get("cantidadStock"), root.get("stockMinimo"))
+    ));
   }
 
   public Producto create(ProductoRequest request) {
     Producto producto = new Producto();
-    copy(request, producto);
+    copyCreate(request, producto);
     return productos.save(producto);
   }
 
   public Producto update(Long id, ProductoRequest request) {
     Producto producto = get(id);
-    copy(request, producto);
+    copyUpdate(request, producto);
     return productos.save(producto);
   }
 
@@ -78,10 +82,15 @@ public class ProductoService {
   @Transactional
   public Producto ajustar(Long id, AjusteStockRequest request, Authentication auth) {
     Producto producto = productos.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Producto no encontrado"));
-    producto.setCantidadStock(Math.max(0, producto.getCantidadStock() + request.cantidad()));
+    validarProductoActivo(producto);
+    int cantidad = request.cantidad();
+    if (cantidad == 0) throw new BusinessException("La cantidad del ajuste no puede ser cero");
+    int nuevoStock = producto.getCantidadStock() + cantidad;
+    if (nuevoStock < 0) throw new BusinessException("El ajuste no puede dejar el stock en negativo");
+    producto.setCantidadStock(nuevoStock);
     MovimientoInventario movimiento = new MovimientoInventario();
     movimiento.setProducto(producto);
-    movimiento.setCantidad(request.cantidad());
+    movimiento.setCantidad(cantidad);
     movimiento.setTipoMovimiento(TipoMovimiento.AJUSTE);
     movimiento.setReferencia(request.motivo());
     movimiento.setUsuarioResponsable(usuarios.findByEmail(auth.getName()).orElseThrow());
@@ -102,14 +111,30 @@ public class ProductoService {
     }
   }
 
-  private void copy(ProductoRequest request, Producto producto) {
+  private void copyCreate(ProductoRequest request, Producto producto) {
+    copyBase(request, producto);
+    producto.setCantidadStock(Optional.ofNullable(request.cantidadStock()).orElse(0));
+  }
+
+  private void copyUpdate(ProductoRequest request, Producto producto) {
+    Integer requestedStock = Optional.ofNullable(request.cantidadStock()).orElse(producto.getCantidadStock());
+    if (!requestedStock.equals(producto.getCantidadStock())) {
+      throw new BusinessException("El stock no se puede editar directamente; usa entrada, salida, ajuste o recepcion");
+    }
+    copyBase(request, producto);
+  }
+
+  private void copyBase(ProductoRequest request, Producto producto) {
     producto.setNombre(request.nombre());
     producto.setDescripcion(request.descripcion());
     producto.setCodigo(request.codigo());
     producto.setCategoria(request.categoria());
-    producto.setCantidadStock(Optional.ofNullable(request.cantidadStock()).orElse(0));
     producto.setStockMinimo(Optional.ofNullable(request.stockMinimo()).orElse(0));
     producto.setUnidadMedida(request.unidadMedida());
     producto.setActivo(request.activo() == null || request.activo());
+  }
+
+  private void validarProductoActivo(Producto producto) {
+    if (!producto.isActivo()) throw new BusinessException("El producto esta inactivo");
   }
 }

@@ -44,7 +44,7 @@ import { Producto, Proveedor } from '../../core/models';
         <div class="grid form-grid">
           <mat-form-field appearance="outline">
             <mat-label>Proveedor</mat-label>
-            <mat-select formControlName="proveedorId">
+            <mat-select formControlName="proveedorId" (selectionChange)="sugerirPreciosOrden()">
               @for (p of proveedores; track p.id) {
                 <mat-option [value]="p.id">{{ p.nombre }}</mat-option>
               }
@@ -58,7 +58,7 @@ import { Producto, Proveedor } from '../../core/models';
             <div [formGroupName]="$index" class="grid form-grid">
               <mat-form-field appearance="outline">
                 <mat-label>Producto</mat-label>
-                <mat-select formControlName="productoId">
+                <mat-select formControlName="productoId" (selectionChange)="sugerirPrecio($index)">
                   @for (p of productos; track p.id) {
                     <mat-option [value]="p.id">{{ p.nombre }}</mat-option>
                   }
@@ -132,6 +132,22 @@ export class OrdenFormComponent implements OnInit {
       const value = control.value;
       return sum + (Number(value.cantidadSolicitada) || 0) * (Number(value.precioUnitario) || 0);
     }, 0);
+  }
+
+  sugerirPreciosOrden() {
+    this.detalles.controls.forEach((_, index) => this.sugerirPrecio(index));
+  }
+
+  sugerirPrecio(index: number) {
+    const proveedorId = Number(this.ordenForm.controls.proveedorId.value);
+    const row = this.detalles.at(index);
+    const productoId = Number(row.value.productoId);
+    if (!proveedorId || !productoId) return;
+
+    this.api.ultimoPrecio({ proveedorId, productoId }).subscribe({
+      next: precio => row.patchValue({ precioUnitario: Number(precio.precioUnitario) }),
+      error: () => {}
+    });
   }
 
   crearOrden() {

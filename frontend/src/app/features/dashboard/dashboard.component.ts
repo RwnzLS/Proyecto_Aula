@@ -11,7 +11,7 @@ import { MatTableModule } from '@angular/material/table';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { DashboardKpi, MovimientoInventario, Producto, Rol } from '../../core/models';
+import { DashboardKpi, MovimientoInventario, MovimientoTipoResumen, Producto, Rol } from '../../core/models';
 import { ThemeService } from '../../core/theme.service';
 import { WorkspaceNavigationService } from '../../core/workspace-navigation.service';
 import { StockMovementDialogComponent, StockMovementDialogResult } from '../movimientos/stock-movement-dialog.component';
@@ -270,9 +270,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   loading = false;
   kpis?: DashboardKpi;
+  stockTotalResumen = 0;
+  ventasTotalResumen = 0;
   productos: Producto[] = [];
   productosCriticos: Producto[] = [];
   movimientos: MovimientoInventario[] = [];
+  movimientosPorTipo: MovimientoTipoResumen[] = [];
   actividadReciente: MovimientoInventario[] = [];
   topSales: { producto: string; cantidad: number }[] = [];
   criticosCols = ['codigo', 'nombre', 'stock', 'accion'];
@@ -306,13 +309,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get stockTotal() {
-    return this.productos.reduce((total, producto) => total + producto.cantidadStock, 0);
+    return this.stockTotalResumen;
   }
 
   get ventasTotal() {
-    return this.movimientos
-      .filter(movimiento => movimiento.tipoMovimiento === 'SALIDA')
-      .reduce((total, movimiento) => total + Math.abs(movimiento.cantidad), 0);
+    return this.ventasTotalResumen;
   }
 
   ngOnInit() {
@@ -336,20 +337,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   load() {
     this.loading = true;
     forkJoin({
-      kpis: this.api.dashboard(),
-      productos: this.api.productos({ size: 100 }),
-      criticos: this.api.productos({ stockBajo: true, size: 5 }),
-      movimientos: this.api.movimientos({ size: 100 })
+      resumen: this.api.dashboardResumen(),
+      productos: this.api.productos({ size: 200 })
     }).subscribe({
-      next: ({ kpis, productos, criticos, movimientos }) => {
-        this.kpis = kpis;
+      next: ({ resumen, productos }) => {
+        this.kpis = resumen.kpis;
+        this.stockTotalResumen = resumen.stockTotal;
+        this.ventasTotalResumen = resumen.ventasTotal;
         this.productos = productos.content;
-        this.productosCriticos = criticos.content;
-        this.movimientos = movimientos.content;
-        this.actividadReciente = [...movimientos.content]
-          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-          .slice(0, 6);
-        this.topSales = this.buildTopSales(movimientos.content);
+        this.productosCriticos = resumen.productosCriticos;
+        this.movimientos = resumen.actividadReciente;
+        this.movimientosPorTipo = resumen.movimientosPorTipo;
+        this.actividadReciente = resumen.actividadReciente;
+        this.topSales = resumen.topVentas.map(item => ({ producto: item.producto, cantidad: item.cantidad }));
         this.loading = false;
         this.renderCharts();
       },
@@ -420,8 +420,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private renderMovementsChart() {
     if (!this.movementsChartCanvas) return;
     this.movementsChart?.destroy();
-    const byType = this.movimientos.reduce((acc, movimiento) => {
-      acc.set(movimiento.tipoMovimiento, (acc.get(movimiento.tipoMovimiento) ?? 0) + Math.abs(movimiento.cantidad));
+    const byType = this.movimientosPorTipo.reduce((acc, movimiento) => {
+      acc.set(movimiento.tipoMovimiento, movimiento.cantidad);
       return acc;
     }, new Map<string, number>());
     const labels = byType.size ? [...byType.keys()] : ['Sin movimientos'];

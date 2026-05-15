@@ -18,3 +18,14 @@ export interface DetalleOrden { id: number; producto: Producto; cantidadSolicita
 export interface OrdenCompra { id: number; proveedor: Proveedor; usuario: UsuarioResponse; fechaCreacion: string; fechaEsperada: string; estado: EstadoOrden; observaciones: string; total: number; detalles: DetalleOrden[]; }
 export interface MovimientoInventario { id: number; producto: Producto; tipoMovimiento: TipoMovimiento; cantidad: number; usuarioResponsable: UsuarioResponse; referencia: string; fecha: string; }
 export interface DashboardKpi { totalProductos: number; stockBajo: number; ordenesPendientes: number; proveedoresActivos: number; }
+export interface MovimientoTipoResumen { tipoMovimiento: TipoMovimiento; cantidad: number; }
+export interface ProductoVentaResumen { productoId: number; producto: string; cantidad: number; }
+export interface DashboardResumen {
+  kpis: DashboardKpi;
+  stockTotal: number;
+  ventasTotal: number;
+  movimientosPorTipo: MovimientoTipoResumen[];
+  topVentas: ProductoVentaResumen[];
+  productosCriticos: Producto[];
+  actividadReciente: MovimientoInventario[];
+}

@@ -8,6 +8,7 @@ import com.proyecto.inventario.entity.DetalleOrden;
 import com.proyecto.inventario.entity.MovimientoInventario;
 import com.proyecto.inventario.entity.OrdenCompra;
 import com.proyecto.inventario.entity.Producto;
+import com.proyecto.inventario.entity.Proveedor;
 import com.proyecto.inventario.entity.Usuario;
 import com.proyecto.inventario.exception.BusinessException;
 import com.proyecto.inventario.exception.NotFoundException;
@@ -60,7 +61,9 @@ public class OrdenService {
   @Transactional
   public OrdenCompra create(OrdenRequest request, Authentication auth) {
     OrdenCompra orden = new OrdenCompra();
-    orden.setProveedor(proveedores.findById(request.proveedorId()).orElseThrow(() -> new NotFoundException("Proveedor no encontrado")));
+    Proveedor proveedor = proveedores.findById(request.proveedorId()).orElseThrow(() -> new NotFoundException("Proveedor no encontrado"));
+    validarProveedorActivo(proveedor);
+    orden.setProveedor(proveedor);
     orden.setUsuario(usuarios.findByEmail(auth.getName()).orElseThrow());
     orden.setFechaEsperada(request.fechaEsperada());
     orden.setObservaciones(request.observaciones());
@@ -68,7 +71,9 @@ public class OrdenService {
     for (DetalleOrdenRequest item : request.detalles()) {
       DetalleOrden detalle = new DetalleOrden();
       detalle.setOrden(orden);
-      detalle.setProducto(productos.findById(item.productoId()).orElseThrow(() -> new NotFoundException("Producto no encontrado")));
+      Producto producto = productos.findById(item.productoId()).orElseThrow(() -> new NotFoundException("Producto no encontrado"));
+      validarProductoActivo(producto);
+      detalle.setProducto(producto);
       detalle.setCantidadSolicitada(item.cantidadSolicitada());
       detalle.setPrecioUnitario(item.precioUnitario());
       total = total.add(item.precioUnitario().multiply(BigDecimal.valueOf(item.cantidadSolicitada())));
@@ -104,6 +109,7 @@ public class OrdenService {
       detalle.setCantidadRecibida(nuevoTotal);
       Producto producto = productos.findByIdForUpdate(detalle.getProducto().getId())
         .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
+      validarProductoActivo(producto);
       producto.setCantidadStock(producto.getCantidadStock() + item.cantidadRecibida());
       MovimientoInventario movimiento = new MovimientoInventario();
       movimiento.setProducto(producto);
@@ -133,5 +139,13 @@ public class OrdenService {
   @Transactional(readOnly = true)
   public OrdenCompra get(Long id) {
     return ordenes.findById(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
+  }
+
+  private void validarProductoActivo(Producto producto) {
+    if (!producto.isActivo()) throw new BusinessException("El producto esta inactivo");
+  }
+
+  private void validarProveedorActivo(Proveedor proveedor) {
+    if (!proveedor.isActivo()) throw new BusinessException("El proveedor esta inactivo");
   }
 }

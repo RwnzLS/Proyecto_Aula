@@ -32,6 +32,7 @@ public class StockMovimientoService {
   @Transactional
   public MovimientoInventario registrarEntrada(MovimientoStockRequest request, Authentication auth) {
     Producto producto = productoConBloqueo(request.productoId());
+    validarProductoActivo(producto);
     producto.setCantidadStock(producto.getCantidadStock() + request.cantidad());
     productos.save(producto);
     return guardarMovimiento(producto, request.cantidad(), TipoMovimiento.ENTRADA, request.referencia(), auth);
@@ -40,6 +41,7 @@ public class StockMovimientoService {
   @Transactional
   public MovimientoInventario registrarSalida(MovimientoStockRequest request, Authentication auth) {
     Producto producto = productoConBloqueo(request.productoId());
+    validarProductoActivo(producto);
     if (producto.getCantidadStock() < request.cantidad()) {
       throw new BusinessException("Stock insuficiente para registrar la salida");
     }
@@ -54,6 +56,10 @@ public class StockMovimientoService {
 
   private Producto productoConBloqueo(Long id) {
     return productos.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Producto no encontrado"));
+  }
+
+  private void validarProductoActivo(Producto producto) {
+    if (!producto.isActivo()) throw new BusinessException("El producto esta inactivo");
   }
 
   private MovimientoInventario guardarMovimiento(Producto producto, Integer cantidad, TipoMovimiento tipo, String referencia, Authentication auth) {

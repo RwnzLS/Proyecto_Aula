@@ -61,14 +61,16 @@ import { UsuariosComponent } from '../usuarios/usuarios.component';
           <ng-template mat-tab-label><mat-icon>category</mat-icon>Productos</ng-template>
           <ng-template matTabContent><app-productos /></ng-template>
         </mat-tab>
-        <mat-tab>
-          <ng-template mat-tab-label><mat-icon>business</mat-icon>Proveedores</ng-template>
-          <ng-template matTabContent><app-proveedores /></ng-template>
-        </mat-tab>
-        <mat-tab>
-          <ng-template mat-tab-label><mat-icon>monitoring</mat-icon>Precios</ng-template>
-          <ng-template matTabContent><app-precios /></ng-template>
-        </mat-tab>
+        @if (can(['ADMIN','GERENTE'])) {
+          <mat-tab>
+            <ng-template mat-tab-label><mat-icon>business</mat-icon>Proveedores</ng-template>
+            <ng-template matTabContent><app-proveedores /></ng-template>
+          </mat-tab>
+          <mat-tab>
+            <ng-template mat-tab-label><mat-icon>monitoring</mat-icon>Precios</ng-template>
+            <ng-template matTabContent><app-precios /></ng-template>
+          </mat-tab>
+        }
         <mat-tab>
           <ng-template mat-tab-label><mat-icon>receipt_long</mat-icon>Ordenes</ng-template>
           <ng-template matTabContent><app-ordenes /></ng-template>

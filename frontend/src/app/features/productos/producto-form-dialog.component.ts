@@ -19,7 +19,7 @@ import { Producto } from '../../core/models';
         <mat-form-field appearance="outline"><mat-label>Codigo</mat-label><input matInput formControlName="codigo"></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Categoria</mat-label><input matInput formControlName="categoria"></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Descripcion</mat-label><input matInput formControlName="descripcion"></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Stock</mat-label><input matInput type="number" formControlName="cantidadStock"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Stock</mat-label><input matInput type="number" formControlName="cantidadStock" [readonly]="!!data.producto"></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Minimo</mat-label><input matInput type="number" formControlName="stockMinimo"></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Unidad</mat-label><input matInput formControlName="unidadMedida"></mat-form-field>
       </form>
