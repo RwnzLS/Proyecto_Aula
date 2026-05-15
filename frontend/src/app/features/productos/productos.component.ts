@@ -1,14 +1,19 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { debounceTime } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime, map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { PageEvent } from '@angular/material/paginator';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -31,9 +36,12 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
     MatButtonModule,
     MatChipsModule,
     MatDialogModule,
+    MatExpansionModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatMenuModule,
+    MatProgressBarModule,
     MatSelectModule,
     DataTableComponent,
     CellDefDirective
@@ -60,7 +68,17 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
         </div>
       </div>
 
-      <div class="filter-panel">
+      <mat-expansion-panel
+        class="filters-panel"
+        [expanded]="!isMobile()"
+        [hideToggle]="!isMobile()">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>filter_list</mat-icon>
+            <span>Filtros</span>
+          </mat-panel-title>
+          <mat-panel-description *ngIf="isMobile()">{{ filtrosResumen() }}</mat-panel-description>
+        </mat-expansion-panel-header>
         <form [formGroup]="productoFiltro" class="grid form-grid">
           <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="nombre"></mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Categoria</mat-label><input matInput formControlName="categoria"></mat-form-field>
@@ -79,7 +97,7 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
             Limpiar
           </button>
         </div>
-      </div>
+      </mat-expansion-panel>
 
       <div class="data-panel">
         <div class="panel-head">
@@ -98,27 +116,107 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
           [pageSize]="pageSize"
           [emptyState]="emptyState"
           (page)="onPage($event)">
+          <ng-template [appCellDef]="'nombre'" let-row>
+            <div class="nombre-cell">
+              <span class="nombre-cell__text u-truncate">{{ row.nombre }}</span>
+              <mat-chip *ngIf="!row.activo" class="chip-inactivo" disableRipple>Inactivo</mat-chip>
+            </div>
+          </ng-template>
           <ng-template [appCellDef]="'stock'" let-row>
-            <mat-chip [class]="row.cantidadStock <= row.stockMinimo ? 'chip-danger' : 'chip-ok'">
-              {{ row.cantidadStock }} / {{ row.stockMinimo }}
-            </mat-chip>
+            <div class="stock-cell" [class.stock-cell--low]="esBajo(row)">
+              <div class="stock-cell__head">
+                <span class="stock-cell__value">{{ row.cantidadStock }}</span>
+                <span class="stock-cell__min u-text-muted">/ {{ row.stockMinimo }}</span>
+              </div>
+              <mat-progress-bar
+                mode="determinate"
+                [value]="progresoStock(row)"
+                [color]="esBajo(row) ? 'warn' : 'primary'"
+                [attr.aria-label]="'Stock ' + row.cantidadStock + ' de minimo ' + row.stockMinimo">
+              </mat-progress-bar>
+            </div>
           </ng-template>
           <ng-template [appCellDef]="'acciones'" let-row>
-            <div class="actions">
-              @if (can(['ADMIN'])) {
-                <button mat-icon-button title="Editar" (click)="abrirProducto(row)"><mat-icon>edit</mat-icon></button>
-              }
-              @if (can(['ADMIN','ALMACENISTA'])) {
-                <button mat-icon-button title="Ajustar" (click)="ajustar(row)"><mat-icon>inventory</mat-icon></button>
-              }
-            </div>
+            <ng-container *ngIf="isMobile(); else accionesInline">
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Acciones">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <button mat-menu-item *ngIf="can(['ADMIN'])" (click)="abrirProducto(row)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Editar</span>
+                </button>
+                <button mat-menu-item *ngIf="can(['ADMIN','ALMACENISTA'])" (click)="ajustar(row)">
+                  <mat-icon>inventory</mat-icon>
+                  <span>Ajustar stock</span>
+                </button>
+              </mat-menu>
+            </ng-container>
+            <ng-template #accionesInline>
+              <div class="actions">
+                <button *ngIf="can(['ADMIN'])" mat-icon-button title="Editar" (click)="abrirProducto(row)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button *ngIf="can(['ADMIN','ALMACENISTA'])" mat-icon-button title="Ajustar stock" (click)="ajustar(row)">
+                  <mat-icon>inventory</mat-icon>
+                </button>
+              </div>
+            </ng-template>
           </ng-template>
         </app-data-table>
       </div>
     </section>
-  `
+  `,
+  styles: [`
+    .filters-panel {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: var(--app-radius-3);
+      box-shadow: var(--app-elevation-2);
+    }
+    .filters-panel mat-panel-title {
+      display: flex;
+      align-items: center;
+      gap: var(--app-space-2);
+      color: var(--app-heading);
+      font-weight: var(--app-weight-semibold);
+    }
+    .filters-panel mat-panel-description {
+      color: var(--app-muted);
+    }
+    .nombre-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--app-space-2);
+    }
+    .chip-inactivo {
+      --mdc-chip-elevated-container-color: var(--app-surface-muted);
+      color: var(--app-muted-strong);
+      font-size: var(--app-font-12);
+      height: 22px;
+    }
+    .stock-cell {
+      display: grid;
+      gap: 4px;
+      min-width: 120px;
+    }
+    .stock-cell__head {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stock-cell__value {
+      color: var(--app-heading);
+      font-weight: var(--app-weight-semibold);
+    }
+    .stock-cell--low .stock-cell__value { color: var(--app-danger); }
+    .stock-cell mat-progress-bar { height: 6px; border-radius: 999px; }
+  `]
 })
 export class ProductosComponent implements OnInit {
+  private readonly breakpoint = inject(BreakpointObserver);
+
   loading = false;
   productos: Producto[] = [];
   productosPage?: Page<Producto>;
@@ -126,9 +224,14 @@ export class ProductosComponent implements OnInit {
   pageSize = 20;
   productoFiltro = this.fb.group({ nombre: [''], categoria: [''], stockBajo: [null as boolean | null] });
 
+  readonly isMobile = toSignal(
+    this.breakpoint.observe('(max-width: 768px)').pipe(map(state => state.matches)),
+    { initialValue: false }
+  );
+
   readonly columns: TableColumn<Producto>[] = [
     { key: 'codigo', header: 'Codigo', sortable: true },
-    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true, value: row => row.nombre },
     { key: 'categoria', header: 'Categoria', sortable: true },
     { key: 'stock', header: 'Stock', sortable: true, value: row => row.cantidadStock },
     { key: 'acciones', header: 'Acciones', align: 'end' }
@@ -155,6 +258,28 @@ export class ProductosComponent implements OnInit {
 
   can(roles: Rol[]) {
     return this.auth.hasRole(roles);
+  }
+
+  esBajo(producto: Producto): boolean {
+    return producto.cantidadStock <= producto.stockMinimo;
+  }
+
+  progresoStock(producto: Producto): number {
+    if (!producto.stockMinimo) {
+      return producto.cantidadStock > 0 ? 100 : 0;
+    }
+    const ratio = (producto.cantidadStock / producto.stockMinimo) * 100;
+    return Math.max(0, Math.min(100, ratio));
+  }
+
+  filtrosResumen(): string {
+    const value = this.productoFiltro.getRawValue();
+    const parts: string[] = [];
+    if (value.nombre) parts.push(`nombre: ${value.nombre}`);
+    if (value.categoria) parts.push(`categoria: ${value.categoria}`);
+    if (value.stockBajo === true) parts.push('stock bajo');
+    if (value.stockBajo === false) parts.push('stock ok');
+    return parts.length ? parts.join(' - ') : 'Sin filtros activos';
   }
 
   loadProductos(page = this.pageIndex, size = this.pageSize) {
@@ -199,7 +324,7 @@ export class ProductosComponent implements OnInit {
   }
 
   ajustar(producto: Producto) {
-    const ref = this.dialog.open(AjusteDialogComponent, { width: '420px', data: { producto } });
+    const ref = this.dialog.open(AjusteDialogComponent, { width: '460px', data: { producto } });
     ref.afterClosed().subscribe((result?: AjusteStockDialogResult) => {
       if (!result) return;
       this.api.ajustarStock(producto.id, result.cantidad, result.motivo).subscribe(() => {

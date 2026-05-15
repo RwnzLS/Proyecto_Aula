@@ -1,40 +1,46 @@
-import { DatePipe } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { debounceTime } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime, map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { MovimientoInventario, Page, Producto, Rol, TipoMovimiento } from '../../core/models';
+import { NotifyService } from '../../shared/notify.service';
+import {
+  CellDefDirective,
+  DataTableComponent,
+  TableColumn
+} from '../../shared/data-table.component';
 import { StockMovementDialogComponent, StockMovementDialogResult } from './stock-movement-dialog.component';
 
 @Component({
   selector: 'app-movimientos',
   standalone: true,
   imports: [
+    CommonModule,
     ReactiveFormsModule,
     DatePipe,
     MatButtonModule,
     MatChipsModule,
     MatDialogModule,
+    MatExpansionModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatPaginatorModule,
-    MatProgressBarModule,
     MatSelectModule,
-    MatSnackBarModule,
-    MatTableModule
+    DataTableComponent,
+    CellDefDirective
   ],
   template: `
     <section class="module-page">
@@ -49,6 +55,10 @@ import { StockMovementDialogComponent, StockMovementDialogResult } from './stock
             <mat-icon>refresh</mat-icon>
             Actualizar
           </button>
+          <button mat-stroked-button type="button" (click)="exportarCsv()" [disabled]="!movimientos.length">
+            <mat-icon>download</mat-icon>
+            CSV
+          </button>
           @if (can(['ADMIN','ALMACENISTA'])) {
             <button mat-raised-button color="primary" type="button" (click)="registrarMovimiento('ENTRADA')">
               <mat-icon>add_box</mat-icon>
@@ -62,7 +72,17 @@ import { StockMovementDialogComponent, StockMovementDialogResult } from './stock
         </div>
       </div>
 
-      <div class="filter-panel">
+      <mat-expansion-panel
+        class="filters-panel"
+        [expanded]="!isMobile()"
+        [hideToggle]="!isMobile()">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>filter_list</mat-icon>
+            <span>Filtros</span>
+          </mat-panel-title>
+          <mat-panel-description *ngIf="isMobile()">{{ filtrosResumen() }}</mat-panel-description>
+        </mat-expansion-panel-header>
         <form [formGroup]="filtros" class="grid form-grid">
           <mat-form-field appearance="outline">
             <mat-label>Producto</mat-label>
@@ -97,11 +117,7 @@ import { StockMovementDialogComponent, StockMovementDialogResult } from './stock
             Limpiar
           </button>
         </div>
-      </div>
-
-      @if (loading) {
-        <mat-progress-bar mode="indeterminate" />
-      }
+      </mat-expansion-panel>
 
       <div class="data-panel">
         <div class="panel-head">
@@ -111,38 +127,63 @@ import { StockMovementDialogComponent, StockMovementDialogResult } from './stock
           </div>
           <span class="count-pill">{{ movimientos.length }}</span>
         </div>
-        @if (movimientos.length) {
-          <div class="table-wrap">
-            <table mat-table [dataSource]="movimientos">
-              <ng-container matColumnDef="fecha"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let m">{{ m.fecha | date:'short' }}</td></ng-container>
-              <ng-container matColumnDef="producto"><th mat-header-cell *matHeaderCellDef>Producto</th><td mat-cell *matCellDef="let m">{{ m.producto.nombre }}</td></ng-container>
-              <ng-container matColumnDef="tipo"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let m"><mat-chip [class]="chipMovimiento(m.tipoMovimiento)">{{ m.tipoMovimiento }}</mat-chip></td></ng-container>
-              <ng-container matColumnDef="cantidad"><th mat-header-cell *matHeaderCellDef>Cantidad</th><td mat-cell *matCellDef="let m">{{ m.cantidad }}</td></ng-container>
-              <ng-container matColumnDef="referencia"><th mat-header-cell *matHeaderCellDef>Referencia</th><td mat-cell *matCellDef="let m">{{ m.referencia }}</td></ng-container>
-              <tr mat-header-row *matHeaderRowDef="movCols"></tr>
-              <tr mat-row *matRowDef="let row; columns: movCols;"></tr>
-            </table>
-            <mat-paginator [length]="movimientosPage?.totalElements ?? 0" [pageIndex]="pageIndex" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="onPage($event)" />
-          </div>
-        } @else {
-          <div class="empty-state">
-            <mat-icon>sync_alt</mat-icon>
-            <h3>No hay movimientos registrados</h3>
-            <p>Registra entradas o salidas, o cambia los filtros activos.</p>
-          </div>
-        }
+        <app-data-table
+          [columns]="columns"
+          [rows]="movimientos"
+          [loading]="loading"
+          [length]="movimientosPage?.totalElements ?? 0"
+          [pageIndex]="pageIndex"
+          [pageSize]="pageSize"
+          [emptyState]="emptyState"
+          (page)="onPage($event)">
+          <ng-template [appCellDef]="'fecha'" let-row>{{ row.fecha | date:'short' }}</ng-template>
+          <ng-template [appCellDef]="'producto'" let-row>{{ row.producto.nombre }}</ng-template>
+          <ng-template [appCellDef]="'tipo'" let-row>
+            <mat-chip [class]="chipMovimiento(row.tipoMovimiento)">
+              <mat-icon class="chip-icon">{{ iconoMovimiento(row.tipoMovimiento) }}</mat-icon>
+              {{ row.tipoMovimiento }}
+            </mat-chip>
+          </ng-template>
+        </app-data-table>
       </div>
     </section>
-  `
+  `,
+  styles: [`
+    .filters-panel {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: var(--app-radius-3);
+      box-shadow: var(--app-elevation-2);
+    }
+    .filters-panel mat-panel-title {
+      display: flex;
+      align-items: center;
+      gap: var(--app-space-2);
+      color: var(--app-heading);
+      font-weight: var(--app-weight-semibold);
+    }
+    .filters-panel mat-panel-description { color: var(--app-muted); }
+    .chip-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      margin-right: 4px;
+    }
+    .mat-mdc-chip.info {
+      --mdc-chip-elevated-container-color: var(--app-accent);
+      color: white;
+    }
+  `]
 })
 export class MovimientosComponent implements OnInit {
+  private readonly breakpoint = inject(BreakpointObserver);
+
   loading = false;
   productos: Producto[] = [];
   movimientos: MovimientoInventario[] = [];
   movimientosPage?: Page<MovimientoInventario>;
   pageIndex = 0;
   pageSize = 20;
-  movCols = ['fecha', 'producto', 'tipo', 'cantidad', 'referencia'];
   tiposMovimiento: TipoMovimiento[] = ['ENTRADA', 'SALIDA', 'AJUSTE'];
   filtros = this.fb.group({
     productoId: [null as number | null],
@@ -151,12 +192,31 @@ export class MovimientosComponent implements OnInit {
     fechaHasta: ['']
   });
 
+  readonly isMobile = toSignal(
+    this.breakpoint.observe('(max-width: 768px)').pipe(map(state => state.matches)),
+    { initialValue: false }
+  );
+
+  readonly columns: TableColumn<MovimientoInventario>[] = [
+    { key: 'fecha', header: 'Fecha', sortable: true, value: row => row.fecha },
+    { key: 'producto', header: 'Producto', sortable: true, value: row => row.producto.nombre },
+    { key: 'tipo', header: 'Tipo', sortable: true, value: row => row.tipoMovimiento },
+    { key: 'cantidad', header: 'Cantidad', sortable: true, align: 'end', value: row => row.cantidad },
+    { key: 'referencia', header: 'Referencia', value: row => row.referencia }
+  ];
+
+  readonly emptyState = {
+    icon: 'sync_alt',
+    title: 'No hay movimientos registrados',
+    message: 'Registra entradas o salidas, o cambia los filtros activos.'
+  };
+
   constructor(
     private api: ApiService,
     private auth: AuthService,
     private fb: FormBuilder,
     private dialog: MatDialog,
-    private snack: MatSnackBar
+    private notify: NotifyService
   ) {}
 
   ngOnInit() {
@@ -199,9 +259,22 @@ export class MovimientosComponent implements OnInit {
     this.loadMovimientos(0, this.pageSize);
   }
 
+  filtrosResumen(): string {
+    const value = this.filtros.getRawValue();
+    const parts: string[] = [];
+    if (value.tipoMovimiento) parts.push(`tipo: ${value.tipoMovimiento}`);
+    if (value.productoId) {
+      const p = this.productos.find(prod => prod.id === value.productoId);
+      if (p) parts.push(`producto: ${p.nombre}`);
+    }
+    if (value.fechaDesde) parts.push(`desde: ${value.fechaDesde}`);
+    if (value.fechaHasta) parts.push(`hasta: ${value.fechaHasta}`);
+    return parts.length ? parts.join(' - ') : 'Sin filtros activos';
+  }
+
   registrarMovimiento(tipo: Exclude<TipoMovimiento, 'AJUSTE'>) {
     if (!this.productos.length) {
-      this.snack.open('Primero registra un producto', 'Cerrar', { duration: 3000 });
+      this.notify.warning('Primero registra un producto');
       return;
     }
 
@@ -210,7 +283,7 @@ export class MovimientosComponent implements OnInit {
       if (!result) return;
       const call = tipo === 'ENTRADA' ? this.api.registrarEntrada(result) : this.api.registrarSalida(result);
       call.subscribe(() => {
-        this.snack.open(tipo === 'ENTRADA' ? 'Entrada registrada' : 'Salida registrada', 'Cerrar', { duration: 2500 });
+        this.notify.success(tipo === 'ENTRADA' ? 'Entrada registrada' : 'Salida registrada');
         this.loadProductos();
         this.loadMovimientos(0, this.pageSize);
       });
@@ -220,10 +293,47 @@ export class MovimientosComponent implements OnInit {
   chipMovimiento(tipo: TipoMovimiento) {
     if (tipo === 'ENTRADA') return 'success';
     if (tipo === 'SALIDA') return 'warn';
-    return 'primary';
+    return 'info';
+  }
+
+  iconoMovimiento(tipo: TipoMovimiento) {
+    if (tipo === 'ENTRADA') return 'south_west';
+    if (tipo === 'SALIDA') return 'north_east';
+    return 'tune';
   }
 
   totalMovimientos() {
     return this.movimientosPage?.totalElements ?? this.movimientos.length;
+  }
+
+  exportarCsv() {
+    if (!this.movimientos.length) return;
+    const header = ['Fecha', 'Producto', 'Codigo', 'Tipo', 'Cantidad', 'Referencia'];
+    const rows = this.movimientos.map(m => [
+      m.fecha,
+      m.producto.nombre,
+      m.producto.codigo,
+      m.tipoMovimiento,
+      String(m.cantidad),
+      m.referencia ?? ''
+    ]);
+    const csv = [header, ...rows].map(row => row.map(this.csvCell).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const fechaArchivo = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `movimientos-${fechaArchivo}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    this.notify.success(`Exportados ${this.movimientos.length} movimientos`);
+  }
+
+  private csvCell(value: string): string {
+    const needsQuotes = /[",\n]/.test(value);
+    const escaped = value.replace(/"/g, '""');
+    return needsQuotes ? `"${escaped}"` : escaped;
   }
 }
