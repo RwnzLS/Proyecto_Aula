@@ -2,10 +2,9 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
 import { Chart, TooltipItem } from 'chart.js/auto';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { forkJoin } from 'rxjs';
+import { forkJoin, timeout } from 'rxjs';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -39,7 +38,6 @@ interface KpiCard {
     CommonModule,
     DatePipe,
     MatButtonModule,
-    MatChipsModule,
     MatDialogModule,
     MatIconModule,
     DataTableComponent,
@@ -151,7 +149,7 @@ interface KpiCard {
               [paginator]="false"
               [emptyState]="criticosEmpty">
               <ng-template [appCellDef]="'stock'" let-row>
-                <mat-chip class="chip-danger">{{ row.cantidadStock }} / {{ row.stockMinimo }}</mat-chip>
+                <span class="status-pill status-pill--danger">{{ row.cantidadStock }} / {{ row.stockMinimo }}</span>
               </ng-template>
               <ng-template [appCellDef]="'accion'" let-row>
                 <div class="actions">
@@ -184,7 +182,7 @@ interface KpiCard {
               <ng-template [appCellDef]="'fecha'" let-row>{{ row.fecha | date:'short' }}</ng-template>
               <ng-template [appCellDef]="'producto'" let-row>{{ row.producto.nombre }}</ng-template>
               <ng-template [appCellDef]="'tipo'" let-row>
-                <mat-chip [class]="chipMovimiento(row.tipoMovimiento)">{{ row.tipoMovimiento }}</mat-chip>
+                <span [class]="'status-pill status-pill--' + chipMovimiento(row.tipoMovimiento)">{{ row.tipoMovimiento }}</span>
               </ng-template>
             </app-data-table>
           </article>
@@ -368,6 +366,23 @@ interface KpiCard {
 
     .hidden-chart { display: none !important; }
 
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: var(--app-radius-pill);
+      font-size: var(--app-font-12);
+      font-weight: var(--app-weight-semibold);
+      background: var(--app-surface-muted);
+      color: var(--app-text);
+      white-space: nowrap;
+    }
+
+    .status-pill--danger { background: var(--app-danger); color: white; }
+    .status-pill--success { background: var(--app-success); color: white; }
+    .status-pill--warn { background: var(--app-warning); color: white; }
+    .status-pill--primary { background: var(--app-accent); color: white; }
+
     .quick-actions {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -534,7 +549,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     forkJoin({
       resumen: this.api.dashboardResumen(),
       productos: this.api.productos({ size: 200 })
-    }).subscribe({
+    }).pipe(timeout(15000)).subscribe({
       next: ({ resumen, productos }) => {
         this.kpis = resumen.kpis;
         this.stockTotalResumen = resumen.stockTotal;
@@ -551,6 +566,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => {
         this.loading = false;
+        this.loaded = true;
+        this.kpis = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
+        this.stockTotalResumen = 0;
+        this.ventasTotalResumen = 0;
+        this.productos = [];
+        this.productosCriticos = [];
+        this.movimientos = [];
+        this.movimientosPorTipo = [];
+        this.actividadReciente = [];
+        this.topSales = [];
+        this.renderCharts();
         this.notify.error('No se pudo cargar el dashboard');
       }
     });
@@ -595,19 +621,27 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private renderCharts() {
     if (!this.viewReady) return;
-    this.renderMovementsChart();
-    this.renderSalesChart();
+    try {
+      this.renderMovementsChart();
+      this.renderSalesChart();
+    } catch (err) {
+      console.error('Dashboard chart render failed', err);
+    }
   }
 
   private renderMovementsChart() {
-    if (!this.movementsChartCanvas) return;
+    if (!this.movementsChartCanvas || !this.movimientosPorTipo.length) {
+      this.movementsChart?.destroy();
+      this.movementsChart = undefined;
+      return;
+    }
     this.movementsChart?.destroy();
     const byType = this.movimientosPorTipo.reduce((acc, movimiento) => {
       acc.set(movimiento.tipoMovimiento, movimiento.cantidad);
       return acc;
     }, new Map<string, number>());
-    const labels = byType.size ? [...byType.keys()] : ['Sin movimientos'];
-    const values = byType.size ? [...byType.values()] : [0];
+    const labels = [...byType.keys()];
+    const values = [...byType.values()];
 
     this.movementsChart = new Chart(this.movementsChartCanvas.nativeElement, {
       type: 'doughnut',
