@@ -61,6 +61,11 @@ Si un hallazgo se verifica como falso positivo o requiere decision de producto, 
   - Cambios #9 (notificacion stock bajo en recepcion): `OrdenService.recepcion()` notifica con `productoService.notifyStock()` si tras recepcion el producto queda ≤ stockMinimo.
   - Tests: `JwtAuthFilterTest`, `InventarioServiceTest`, `OrdenServiceTest`.
 
+- [x] #20 - Dashboard no responde por cascada de logout tras 401.
+  - Commit: `fix: evitar cascada de logout en dashboard`
+  - Cambios: `AuthService.logout()` queda idempotente y el `errorInterceptor` no dispara logout global para `/auth/login` ni `/auth/logout`, evitando recursion si una sesion local queda sin cookie valida o si el backend de logout falla.
+  - Verificacion: `npm run build`.
+
 ## Pendientes reales o decisiones de arquitectura
 
 ## Hallazgos verificados como falso positivo o no-bug actual
