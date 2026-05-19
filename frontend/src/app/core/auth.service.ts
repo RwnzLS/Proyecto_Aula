@@ -11,6 +11,7 @@ export interface Session { nombre: string; email: string; rol: Rol; }
 export class AuthService {
   private readonly key = 'inventario.session';
   private readonly sessionSignal = signal<Session | null>(this.readSession());
+  private loggingOut = false;
   readonly session = this.sessionSignal.asReadonly();
   readonly isLoggedIn = computed(() => !!this.sessionSignal());
 
@@ -27,6 +28,11 @@ export class AuthService {
   }
 
   logout() {
+    if (this.loggingOut) {
+      this.clearSession();
+      return;
+    }
+    this.loggingOut = true;
     // El backend limpia la cookie HttpOnly; pase lo que pase se descarta la sesion local.
     this.http.post(`${environment.apiUrl}/auth/logout`, {}).subscribe({
       next: () => this.clearSession(),
@@ -42,6 +48,7 @@ export class AuthService {
   private clearSession() {
     localStorage.removeItem(this.key);
     this.sessionSignal.set(null);
+    this.loggingOut = false;
     this.router.navigateByUrl('/login');
   }
 
