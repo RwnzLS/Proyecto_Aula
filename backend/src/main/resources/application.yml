@@ -34,6 +34,8 @@ app:
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
   auth:
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    # Strict/Lax si frontend y backend comparten sitio; None (con cookie-secure=true) si estan en dominios distintos.
+    cookie-same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
   mail:
     from: ${MAIL_FROM:no-reply@inventario.local}
     ops-email: ${OPS_EMAIL:admin@inventario.local}

@@ -66,12 +66,46 @@ Si un hallazgo se verifica como falso positivo o requiere decision de producto, 
   - Cambios: `AuthService.logout()` queda idempotente y el `errorInterceptor` no dispara logout global para `/auth/login` ni `/auth/logout`, evitando recursion si una sesion local queda sin cookie valida o si el backend de logout falla.
   - Verificacion: `npm run build`.
 
+- [x] #21 - Cascada a login por desincronia entre `localStorage` y la cookie HttpOnly.
+  - Sintoma reportado: tras el PR #2 (JWT en cookie HttpOnly), casi cualquier accion mostraba
+    "Sesion expirada" / "API no disponible" y devolvia al usuario a `/login`.
+  - Diagnostico de IAs revisado: culpaban a CORS (`.cors(cors -> {})`, `allowedHeaders`).
+    Verificado como **falso positivo** (ver hallazgo #5 ampliado abajo).
+  - Causa raiz real: `isLoggedIn` del frontend se derivaba solo de `localStorage`, que
+    sobrevive a la expiracion/borrado de la cookie HttpOnly y al reinicio del backend.
+    Cuando `localStorage` quedaba sin una cookie viva, el `roleGuard` dejaba entrar, la
+    primera llamada respondia 401 y el `errorInterceptor` disparaba el logout en cascada.
+  - Cambios backend: nuevo endpoint `GET /api/auth/session` (`AuthController.session()` +
+    `AuthService.currentSession()`) que devuelve la sesion si la cookie es valida o 401 si
+    no; `AuthCookie` hace el atributo `SameSite` configurable (`app.auth.cookie-same-site`,
+    default `Strict`); `SecurityConfig` enlaza el `CorsConfigurationSource` de forma
+    explicita (claridad, no era un bug).
+  - Cambios frontend: `AuthService.verifySession()` revalida contra `/auth/session` y trata
+    `localStorage` solo como pista de arranque; `main.ts` agrega un `APP_INITIALIZER` que
+    revalida la sesion antes de levantar el router; `errorInterceptor` deduplica el toast
+    "Sesion expirada" y trata `/auth/session` como auth-endpoint.
+  - Hardening de configuracion: nuevo `backend/.env.example` y README documentan
+    `JWT_SECRET`, `CORS_ORIGINS`, `AUTH_COOKIE_SECURE` y `AUTH_COOKIE_SAME_SITE`.
+  - Nota cross-site: con front y back en dominios distintos hay que usar
+    `AUTH_COOKIE_SAME_SITE=None` + `AUTH_COOKIE_SECURE=true` (HTTPS), o la cookie no viaja.
+  - Tests: `AuthControllerTest`, `AuthCookieTest`, `AuthServiceTest.currentSession...`.
+  - Verificacion: `mvn test` y `npm run build`.
+
 ## Pendientes reales o decisiones de arquitectura
 
 ## Hallazgos verificados como falso positivo o no-bug actual
 
 - [x] #5 - CORS con `.cors(cors -> {})`.
-  - Veredicto: falso positivo funcional. Spring Security puede autodetectar el bean `CorsConfigurationSource`.
+  - Veredicto: falso positivo confirmado (revisado de nuevo al investigar #21).
+  - Por que no es bug: `CorsConfigurer` resuelve el `CorsConfigurationSource` buscando un
+    bean **llamado `corsConfigurationSource`**; el `@Bean` ya se llama exactamente asi, asi
+    que `.cors(cors -> {})` lo autodetecta. La resolucion ocurre al construir la
+    `SecurityFilterChain`, despues de registrar todos los beans: no hay race de inicializacion.
+  - Ampliar `allowedHeaders` con `Cookie` tampoco aplica: `Cookie` es un *forbidden header
+    name*, el navegador nunca lo lista en el preflight `Access-Control-Request-Headers`.
+    Angular `HttpClient` tampoco envia `X-Requested-With`.
+  - En #21 se cambio `.cors(cors -> {})` por el enlace explicito solo como mejora de
+    claridad, no como correccion funcional.
   - Riesgo residual: si en produccion se configura wildcard con credenciales, revisar `CORS_ORIGINS`.
 
 - [x] #10 - `sumCantidadByTipo()` con ajustes negativos.

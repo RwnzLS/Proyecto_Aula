@@ -35,6 +35,10 @@ DB_URL=jdbc:mysql://localhost:3306/inventario_db?useSSL=false&allowPublicKeyRetr
 DB_USERNAME=root
 DB_PASSWORD=root
 JWT_SECRET=<valor-aleatorio-de-al-menos-32-caracteres>
+JWT_EXPIRATION_MINUTES=480
+CORS_ORIGINS=http://localhost:4200
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAME_SITE=Strict
 APP_TIME_ZONE=America/Bogota
 MAIL_HOST=localhost
 MAIL_PORT=1025
@@ -44,7 +48,15 @@ MAIL_FROM=no-reply@inventario.local
 OPS_EMAIL=admin@inventario.local
 ```
 
+Hay una plantilla lista para copiar en `backend/.env.example`.
+
 `JWT_SECRET` es obligatorio. El backend no arranca si falta, mide menos de 32 caracteres o usa el placeholder inseguro anterior.
+
+Cookie de sesion (`access_token`, HttpOnly): `AUTH_COOKIE_SAME_SITE` vale `Strict` cuando
+frontend y backend comparten sitio (p. ej. `localhost:4200` y `localhost:8080` en
+desarrollo). Si se despliegan en **dominios distintos**, el navegador no envia una cookie
+`Strict`/`Lax` en peticiones cross-site: en ese caso usa `AUTH_COOKIE_SAME_SITE=None` junto
+con `AUTH_COOKIE_SECURE=true` (requiere HTTPS) o el login no podra mantener la sesion.
 
 ## Ejecutar backend
 

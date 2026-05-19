@@ -2,6 +2,7 @@ package com.proyecto.inventario.service;
 
 import com.proyecto.inventario.dto.Dtos.LoginRequest;
 import com.proyecto.inventario.dto.Dtos.LoginResponse;
+import com.proyecto.inventario.dto.Dtos.SessionResponse;
 import com.proyecto.inventario.dto.Dtos.UserRequest;
 import com.proyecto.inventario.dto.Dtos.UsuarioResponse;
 import com.proyecto.inventario.entity.Usuario;
@@ -34,6 +35,15 @@ public class AuthService {
     auth.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
     Usuario usuario = usuarios.findByEmail(request.email()).orElseThrow();
     return new LoginResponse(jwt.generate(usuario), usuario.getNombre(), usuario.getEmail(), usuario.getRol());
+  }
+
+  /**
+   * Devuelve los datos de la sesion del usuario autenticado por la cookie. Permite que el
+   * frontend revalide contra el backend en lugar de confiar ciegamente en localStorage.
+   */
+  public SessionResponse currentSession(String email) {
+    Usuario usuario = usuarios.findByEmail(email).orElseThrow();
+    return new SessionResponse(usuario.getNombre(), usuario.getEmail(), usuario.getRol());
   }
 
   @Transactional

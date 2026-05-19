@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs';
+import { Observable, catchError, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Rol } from './models';
 
@@ -10,6 +10,8 @@ export interface Session { nombre: string; email: string; rol: Rol; }
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly key = 'inventario.session';
+  // localStorage es solo una pista de arranque; la fuente de verdad es la cookie HttpOnly,
+  // que el cliente no puede leer y se valida contra el backend con verifySession().
   private readonly sessionSignal = signal<Session | null>(this.readSession());
   private loggingOut = false;
   readonly session = this.sessionSignal.asReadonly();
@@ -20,9 +22,21 @@ export class AuthService {
   login(email: string, password: string) {
     // El backend responde con el JWT en una cookie HttpOnly; el cuerpo solo trae datos de la sesion.
     return this.http.post<Session>(`${environment.apiUrl}/auth/login`, { email, password }).pipe(
-      tap(session => {
-        localStorage.setItem(this.key, JSON.stringify(session));
-        this.sessionSignal.set(session);
+      tap(session => this.storeSession(session))
+    );
+  }
+
+  /**
+   * Revalida la sesion contra el backend (la cookie HttpOnly debe seguir viva). Se usa al
+   * arrancar la app: si la cookie expiro o falta, descarta la sesion local sin redirigir
+   * ni notificar, evitando la cascada de errores "Sesion expirada" en cada peticion.
+   */
+  verifySession(): Observable<Session | null> {
+    return this.http.get<Session>(`${environment.apiUrl}/auth/session`).pipe(
+      tap(session => this.storeSession(session)),
+      catchError(() => {
+        this.clearLocalSession();
+        return of(null);
       })
     );
   }
@@ -45,10 +59,19 @@ export class AuthService {
     return !!current && roles.includes(current.rol);
   }
 
-  private clearSession() {
+  private storeSession(session: Session) {
+    localStorage.setItem(this.key, JSON.stringify(session));
+    this.sessionSignal.set(session);
+  }
+
+  private clearLocalSession() {
     localStorage.removeItem(this.key);
     this.sessionSignal.set(null);
     this.loggingOut = false;
+  }
+
+  private clearSession() {
+    this.clearLocalSession();
     this.router.navigateByUrl('/login');
   }
 
