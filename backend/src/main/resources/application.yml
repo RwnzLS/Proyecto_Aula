@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/inventario_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/inventario_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${DB_USERNAME:inventario}
     password: ${DB_PASSWORD:inventario123}
   jpa:
@@ -30,7 +30,7 @@ app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
   jwt:
-    secret: ${JWT_SECRET:}
+    secret: ${JWT_SECRET:dev-local-jwt-secret-key-at-least-32-chars-long}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
   auth:
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
