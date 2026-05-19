@@ -85,7 +85,7 @@ public class OrdenService {
 
   @Transactional
   public OrdenCompra enviar(Long id) {
-    OrdenCompra orden = get(id);
+    OrdenCompra orden = getForUpdate(id);
     if (orden.getEstado() != EstadoOrden.BORRADOR) throw new BusinessException("Solo se pueden enviar ordenes en borrador");
     orden.setEstado(EstadoOrden.ENVIADA);
     OrdenCompra saved = ordenes.save(orden);
@@ -96,7 +96,7 @@ public class OrdenService {
 
   @Transactional
   public OrdenCompra recepcion(Long id, RecepcionRequest request, Authentication auth) {
-    OrdenCompra orden = get(id);
+    OrdenCompra orden = getForUpdate(id);
     if (orden.getEstado() != EstadoOrden.ENVIADA && orden.getEstado() != EstadoOrden.RECIBIDA_PARCIAL) {
       throw new BusinessException("Solo se puede recibir mercancia en ordenes ENVIADA o RECIBIDA_PARCIAL");
     }
@@ -128,7 +128,7 @@ public class OrdenService {
 
   @Transactional
   public OrdenCompra cancelar(Long id) {
-    OrdenCompra orden = get(id);
+    OrdenCompra orden = getForUpdate(id);
     if (orden.getEstado() == EstadoOrden.RECIBIDA || orden.getEstado() == EstadoOrden.CANCELADA) {
       throw new BusinessException("No se puede cancelar una orden en estado " + orden.getEstado());
     }
@@ -139,6 +139,10 @@ public class OrdenService {
   @Transactional(readOnly = true)
   public OrdenCompra get(Long id) {
     return ordenes.findById(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
+  }
+
+  private OrdenCompra getForUpdate(Long id) {
+    return ordenes.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
   }
 
   private void validarProductoActivo(Producto producto) {
