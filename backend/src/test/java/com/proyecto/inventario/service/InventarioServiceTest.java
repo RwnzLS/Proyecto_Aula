@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.proyecto.inventario.dto.Dtos.AjusteStockRequest;
 import com.proyecto.inventario.dto.Dtos.MovimientoStockRequest;
+import com.proyecto.inventario.dto.Dtos.ProductoRequest;
 import com.proyecto.inventario.entity.MovimientoInventario;
 import com.proyecto.inventario.entity.Producto;
 import com.proyecto.inventario.entity.Usuario;
@@ -151,6 +152,26 @@ class InventarioServiceTest {
     verify(movimientos, never()).save(any());
   }
 
+  @Test
+  void actualizarProductoNoCambiaActivoCuandoVieneNulo() {
+    Producto producto = producto(10, 3, false);
+    when(productos.findById(1L)).thenReturn(Optional.of(producto));
+
+    Producto saved = productoService.update(1L, productoRequest(null, 10));
+
+    assertThat(saved.isActivo()).isFalse();
+  }
+
+  @Test
+  void actualizarProductoIgnoraActivoDelRequest() {
+    Producto producto = producto(10, 3, true);
+    when(productos.findById(1L)).thenReturn(Optional.of(producto));
+
+    Producto saved = productoService.update(1L, productoRequest(false, 10));
+
+    assertThat(saved.isActivo()).isTrue();
+  }
+
   private Producto producto(int stock, int minimo, boolean activo) {
     Producto producto = new Producto();
     producto.setNombre("Producto test");
@@ -159,5 +180,18 @@ class InventarioServiceTest {
     producto.setStockMinimo(minimo);
     producto.setActivo(activo);
     return producto;
+  }
+
+  private ProductoRequest productoRequest(Boolean activo, Integer cantidadStock) {
+    return new ProductoRequest(
+      "Producto actualizado",
+      "Descripcion",
+      "TEST",
+      "Categoria",
+      cantidadStock,
+      3,
+      "unidad",
+      activo
+    );
   }
 }

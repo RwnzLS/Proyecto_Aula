@@ -3,17 +3,25 @@ package com.proyecto.inventario.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.proyecto.inventario.dto.Dtos.DetalleOrdenRequest;
 import com.proyecto.inventario.dto.Dtos.OrdenRequest;
+import com.proyecto.inventario.dto.Dtos.RecepcionItemRequest;
+import com.proyecto.inventario.dto.Dtos.RecepcionRequest;
+import com.proyecto.inventario.entity.DetalleOrden;
+import com.proyecto.inventario.entity.MovimientoInventario;
 import com.proyecto.inventario.entity.OrdenCompra;
 import com.proyecto.inventario.entity.Producto;
 import com.proyecto.inventario.entity.Proveedor;
 import com.proyecto.inventario.entity.Usuario;
 import com.proyecto.inventario.exception.BusinessException;
+import com.proyecto.inventario.model.EstadoOrden;
 import com.proyecto.inventario.model.Rol;
 import com.proyecto.inventario.repository.MovimientoInventarioRepository;
 import com.proyecto.inventario.repository.OrdenCompraRepository;
@@ -30,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class OrdenServiceTest {
@@ -37,6 +46,8 @@ class OrdenServiceTest {
   private ProductoRepository productos;
   private ProveedorRepository proveedores;
   private UsuarioRepository usuarios;
+  private MovimientoInventarioRepository movimientos;
+  private EmailService email;
   private OrdenService service;
   private Authentication auth;
 
@@ -46,8 +57,9 @@ class OrdenServiceTest {
     productos = mock(ProductoRepository.class);
     proveedores = mock(ProveedorRepository.class);
     usuarios = mock(UsuarioRepository.class);
-    MovimientoInventarioRepository movimientos = mock(MovimientoInventarioRepository.class);
-    service = new OrdenService(ordenes, productos, proveedores, usuarios, movimientos, null);
+    movimientos = mock(MovimientoInventarioRepository.class);
+    email = mock(EmailService.class);
+    service = new OrdenService(ordenes, productos, proveedores, usuarios, movimientos, email);
 
     Usuario usuario = new Usuario();
     usuario.setEmail("gerente@inventario.local");
@@ -55,6 +67,7 @@ class OrdenServiceTest {
     auth = new UsernamePasswordAuthenticationToken(usuario.getEmail(), "password");
     lenient().when(usuarios.findByEmail(usuario.getEmail())).thenReturn(Optional.of(usuario));
     lenient().when(ordenes.save(any(OrdenCompra.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    lenient().when(movimientos.save(any(MovimientoInventario.class))).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @Test
@@ -91,6 +104,64 @@ class OrdenServiceTest {
     assertThatThrownBy(() -> service.create(requestBasico(), auth))
       .isInstanceOf(BusinessException.class)
       .hasMessageContaining("producto");
+  }
+
+  @Test
+  void enviarCargaOrdenConBloqueoPesimista() {
+    Proveedor proveedor = proveedor(true);
+    proveedor.setEmail("proveedor@inventario.local");
+    OrdenCompra orden = new OrdenCompra();
+    ReflectionTestUtils.setField(orden, "id", 1L);
+    orden.setProveedor(proveedor);
+    orden.setEstado(EstadoOrden.BORRADOR);
+    when(ordenes.findByIdForUpdate(1L)).thenReturn(Optional.of(orden));
+
+    OrdenCompra enviada = service.enviar(1L);
+
+    verify(ordenes).findByIdForUpdate(1L);
+    verify(ordenes, never()).findById(1L);
+    verify(email).sendTemplate(eq("proveedor@inventario.local"), eq("Orden de compra #1"), eq("orden-enviada"), any());
+    assertThat(enviada.getEstado()).isEqualTo(EstadoOrden.ENVIADA);
+  }
+
+  @Test
+  void recepcionCargaOrdenConBloqueoPesimista() {
+    Producto producto = producto(true);
+    producto.setCantidadStock(10);
+    ReflectionTestUtils.setField(producto, "id", 2L);
+    DetalleOrden detalle = new DetalleOrden();
+    ReflectionTestUtils.setField(detalle, "id", 10L);
+    detalle.setProducto(producto);
+    detalle.setCantidadSolicitada(5);
+    detalle.setCantidadRecibida(0);
+    OrdenCompra orden = new OrdenCompra();
+    ReflectionTestUtils.setField(orden, "id", 1L);
+    orden.setEstado(EstadoOrden.ENVIADA);
+    orden.getDetalles().add(detalle);
+
+    when(ordenes.findByIdForUpdate(1L)).thenReturn(Optional.of(orden));
+    when(productos.findByIdForUpdate(2L)).thenReturn(Optional.of(producto));
+
+    OrdenCompra recibida = service.recepcion(1L, new RecepcionRequest(List.of(new RecepcionItemRequest(10L, 3))), auth);
+
+    verify(ordenes).findByIdForUpdate(1L);
+    verify(ordenes, never()).findById(1L);
+    assertThat(detalle.getCantidadRecibida()).isEqualTo(3);
+    assertThat(producto.getCantidadStock()).isEqualTo(13);
+    assertThat(recibida.getEstado()).isEqualTo(EstadoOrden.RECIBIDA_PARCIAL);
+  }
+
+  @Test
+  void cancelarCargaOrdenConBloqueoPesimista() {
+    OrdenCompra orden = new OrdenCompra();
+    orden.setEstado(EstadoOrden.BORRADOR);
+    when(ordenes.findByIdForUpdate(1L)).thenReturn(Optional.of(orden));
+
+    OrdenCompra cancelada = service.cancelar(1L);
+
+    verify(ordenes).findByIdForUpdate(1L);
+    verify(ordenes, never()).findById(1L);
+    assertThat(cancelada.getEstado()).isEqualTo(EstadoOrden.CANCELADA);
   }
 
   private OrdenRequest requestBasico() {

@@ -56,18 +56,21 @@ public class ProductoService {
     ));
   }
 
+  @Transactional
   public Producto create(ProductoRequest request) {
     Producto producto = new Producto();
     copyCreate(request, producto);
     return productos.save(producto);
   }
 
+  @Transactional
   public Producto update(Long id, ProductoRequest request) {
     Producto producto = get(id);
     copyUpdate(request, producto);
     return productos.save(producto);
   }
 
+  @Transactional
   public void delete(Long id) {
     Producto producto = get(id);
     producto.setActivo(false);
@@ -114,6 +117,7 @@ public class ProductoService {
   private void copyCreate(ProductoRequest request, Producto producto) {
     copyBase(request, producto);
     producto.setCantidadStock(Optional.ofNullable(request.cantidadStock()).orElse(0));
+    producto.setActivo(request.activo() == null || request.activo());
   }
 
   private void copyUpdate(ProductoRequest request, Producto producto) {
@@ -131,7 +135,6 @@ public class ProductoService {
     producto.setCategoria(request.categoria());
     producto.setStockMinimo(Optional.ofNullable(request.stockMinimo()).orElse(0));
     producto.setUnidadMedida(request.unidadMedida());
-    producto.setActivo(request.activo() == null || request.activo());
   }
 
   private void validarProductoActivo(Producto producto) {

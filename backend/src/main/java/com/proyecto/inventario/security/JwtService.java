@@ -4,6 +4,7 @@ import com.proyecto.inventario.entity.Usuario;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
@@ -13,11 +14,17 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
+  private static final int MIN_SECRET_LENGTH = 32;
+  private static final String DEFAULT_SECRET_PLACEHOLDER = "change-this-secret-key-with-at-least-32-characters";
   private final SecretKey key;
   private final long expirationMillis;
 
   public JwtService(@Value("${app.jwt.secret}") String secret, @Value("${app.jwt.expiration-minutes}") long minutes) {
-    this.key = Keys.hmacShaKeyFor(secret.getBytes());
+    String normalizedSecret = secret == null ? "" : secret.trim();
+    if (normalizedSecret.length() < MIN_SECRET_LENGTH || DEFAULT_SECRET_PLACEHOLDER.equals(normalizedSecret)) {
+      throw new IllegalStateException("JWT_SECRET debe configurarse con al menos 32 caracteres y no puede usar el valor por defecto inseguro");
+    }
+    this.key = Keys.hmacShaKeyFor(normalizedSecret.getBytes(StandardCharsets.UTF_8));
     this.expirationMillis = minutes * 60_000;
   }
 
