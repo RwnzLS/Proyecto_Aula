@@ -36,10 +36,11 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
-    // El JWT viaja en una cookie SameSite=Strict (ver AuthCookie): el navegador no la envia
-    // en peticiones cross-site, por lo que no se requiere un token CSRF adicional.
+    // El JWT viaja en una cookie SameSite configurable (ver AuthCookie); con Strict/Lax el
+    // navegador no la envia cross-site, por lo que no se requiere un token CSRF adicional.
+    // El CorsConfigurationSource se enlaza explicitamente para no depender de la autodeteccion.
     return http.csrf(csrf -> csrf.disable())
-      .cors(cors -> {})
+      .cors(cors -> cors.configurationSource(corsConfigurationSource()))
       .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/api/auth/login", "/api/auth/logout", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
