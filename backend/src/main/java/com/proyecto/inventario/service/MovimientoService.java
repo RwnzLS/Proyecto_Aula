@@ -4,7 +4,8 @@ import com.proyecto.inventario.entity.MovimientoInventario;
 import com.proyecto.inventario.model.TipoMovimiento;
 import com.proyecto.inventario.repository.MovimientoInventarioRepository;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MovimientoService {
   private final MovimientoInventarioRepository movimientos;
+  private final ZoneId businessZone;
 
-  public MovimientoService(MovimientoInventarioRepository movimientos) {
+  public MovimientoService(MovimientoInventarioRepository movimientos, @Value("${app.time-zone:America/Bogota}") String businessZone) {
     this.movimientos = movimientos;
+    this.businessZone = ZoneId.of(businessZone);
   }
 
   @Transactional(readOnly = true)
@@ -27,10 +30,10 @@ public class MovimientoService {
     if (productoId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("producto").get("id"), productoId));
     if (tipoMovimiento != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("tipoMovimiento"), tipoMovimiento));
     if (fechaDesde != null) {
-      spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("fecha"), fechaDesde.atStartOfDay().toInstant(ZoneOffset.UTC)));
+      spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("fecha"), fechaDesde.atStartOfDay(businessZone).toInstant()));
     }
     if (fechaHasta != null) {
-      spec = spec.and((root, query, cb) -> cb.lessThan(root.get("fecha"), fechaHasta.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
+      spec = spec.and((root, query, cb) -> cb.lessThan(root.get("fecha"), fechaHasta.plusDays(1).atStartOfDay(businessZone).toInstant()));
     }
     return movimientos.findAll(spec, defaultSort(pageable));
   }

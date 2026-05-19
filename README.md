@@ -35,6 +35,7 @@ DB_URL=jdbc:mysql://localhost:3306/inventario_db?useSSL=false&allowPublicKeyRetr
 DB_USERNAME=root
 DB_PASSWORD=root
 JWT_SECRET=<valor-aleatorio-de-al-menos-32-caracteres>
+APP_TIME_ZONE=America/Bogota
 MAIL_HOST=localhost
 MAIL_PORT=1025
 MAIL_USERNAME=

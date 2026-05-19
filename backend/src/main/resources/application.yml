@@ -26,6 +26,7 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS:false}
 
 app:
+  time-zone: ${APP_TIME_ZONE:America/Bogota}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
   jwt:
