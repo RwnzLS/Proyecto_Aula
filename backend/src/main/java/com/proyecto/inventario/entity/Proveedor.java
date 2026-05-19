@@ -18,7 +18,8 @@ public class Proveedor {
   private Long id;
   @NotBlank
   private String nombre;
-  @Column(name = "ruc_nit", unique = true)
+  @NotBlank
+  @Column(name = "ruc_nit", unique = true, nullable = false)
   private String rucNit;
   @Email
   private String email;

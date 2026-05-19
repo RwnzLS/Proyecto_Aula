@@ -20,6 +20,7 @@ import com.proyecto.inventario.repository.ProductoRepository;
 import com.proyecto.inventario.repository.ProveedorRepository;
 import com.proyecto.inventario.repository.UsuarioRepository;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,15 +40,18 @@ public class OrdenService {
   private final UsuarioRepository usuarios;
   private final MovimientoInventarioRepository movimientos;
   private final EmailService email;
+  private final ProductoService productoService;
 
   public OrdenService(OrdenCompraRepository ordenes, ProductoRepository productos, ProveedorRepository proveedores,
-                      UsuarioRepository usuarios, MovimientoInventarioRepository movimientos, EmailService email) {
+                      UsuarioRepository usuarios, MovimientoInventarioRepository movimientos, EmailService email,
+                      ProductoService productoService) {
     this.ordenes = ordenes;
     this.productos = productos;
     this.proveedores = proveedores;
     this.usuarios = usuarios;
     this.movimientos = movimientos;
     this.email = email;
+    this.productoService = productoService;
   }
 
   @Transactional(readOnly = true)
@@ -102,6 +106,7 @@ public class OrdenService {
     }
     Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow();
     Map<Long, DetalleOrden> byId = orden.getDetalles().stream().collect(Collectors.toMap(DetalleOrden::getId, d -> d));
+    Map<Long, Producto> afectados = new LinkedHashMap<>();
     for (RecepcionItemRequest item : request.items()) {
       DetalleOrden detalle = Optional.ofNullable(byId.get(item.detalleId())).orElseThrow(() -> new NotFoundException("Detalle no encontrado"));
       int nuevoTotal = detalle.getCantidadRecibida() + item.cantidadRecibida();
@@ -119,11 +124,17 @@ public class OrdenService {
       movimiento.setReferencia("OC-" + orden.getId());
       movimientos.save(movimiento);
       productos.save(producto);
+      afectados.put(producto.getId(), producto);
     }
     boolean completa = orden.getDetalles().stream()
       .allMatch(detalle -> Objects.equals(detalle.getCantidadRecibida(), detalle.getCantidadSolicitada()));
     orden.setEstado(completa ? EstadoOrden.RECIBIDA : EstadoOrden.RECIBIDA_PARCIAL);
-    return ordenes.save(orden);
+    OrdenCompra saved = ordenes.save(orden);
+    // La recepcion sube stock; si una recepcion parcial deja el producto en/bajo el minimo, avisar como en ajuste y salida.
+    afectados.values().stream()
+      .filter(producto -> producto.getCantidadStock() <= producto.getStockMinimo())
+      .forEach(productoService::notifyStock);
+    return saved;
   }
 
   @Transactional

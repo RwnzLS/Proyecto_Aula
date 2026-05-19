@@ -10,11 +10,12 @@ export class ApiService {
 
   dashboard() { return this.http.get<DashboardKpi>(`${this.api}/dashboard`); }
   dashboardResumen() { return this.http.get<DashboardResumen>(`${this.api}/dashboard/resumen`); }
-  productos(filters: { nombre?: string | null; categoria?: string | null; stockBajo?: boolean | null; page?: number; size?: number } = {}) {
+  productos(filters: { nombre?: string | null; categoria?: string | null; stockBajo?: boolean | null; activo?: boolean | null; page?: number; size?: number } = {}) {
     return this.http.get<Page<Producto>>(`${this.api}/productos`, { params: this.params(filters) });
   }
   crearProducto(body: Partial<Producto>) { return this.http.post<Producto>(`${this.api}/productos`, body); }
   actualizarProducto(id: number, body: Partial<Producto>) { return this.http.put<Producto>(`${this.api}/productos/${id}`, body); }
+  reactivarProducto(id: number) { return this.http.patch<Producto>(`${this.api}/productos/${id}/reactivar`, {}); }
   ajustarStock(id: number, cantidad: number, motivo: string) { return this.http.patch<Producto>(`${this.api}/productos/${id}/ajustar-stock`, { cantidad, motivo }); }
   registrarEntrada(body: { productoId: number; cantidad: number; referencia: string }) { return this.http.post<MovimientoInventario>(`${this.api}/entradas`, body); }
   registrarSalida(body: { productoId: number; cantidad: number; referencia: string }) { return this.http.post<MovimientoInventario>(`${this.api}/salidas`, body); }

@@ -172,6 +172,16 @@ class InventarioServiceTest {
     assertThat(saved.isActivo()).isTrue();
   }
 
+  @Test
+  void reactivarPoneProductoComoActivo() {
+    Producto producto = producto(10, 3, false);
+    when(productos.findById(1L)).thenReturn(Optional.of(producto));
+
+    Producto saved = productoService.reactivar(1L);
+
+    assertThat(saved.isActivo()).isTrue();
+  }
+
   private Producto producto(int stock, int minimo, boolean activo) {
     Producto producto = new Producto();
     producto.setNombre("Producto test");

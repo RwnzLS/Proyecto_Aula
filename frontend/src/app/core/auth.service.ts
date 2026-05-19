@@ -5,8 +5,7 @@ import { tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Rol } from './models';
 
-interface LoginResponse { token: string; nombre: string; email: string; rol: Rol; }
-export interface Session { token: string; nombre: string; email: string; rol: Rol; }
+export interface Session { nombre: string; email: string; rol: Rol; }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -18,18 +17,21 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) {}
 
   login(email: string, password: string) {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, { email, password }).pipe(
-      tap(response => {
-        localStorage.setItem(this.key, JSON.stringify(response));
-        this.sessionSignal.set(response);
+    // El backend responde con el JWT en una cookie HttpOnly; el cuerpo solo trae datos de la sesion.
+    return this.http.post<Session>(`${environment.apiUrl}/auth/login`, { email, password }).pipe(
+      tap(session => {
+        localStorage.setItem(this.key, JSON.stringify(session));
+        this.sessionSignal.set(session);
       })
     );
   }
 
   logout() {
-    localStorage.removeItem(this.key);
-    this.sessionSignal.set(null);
-    this.router.navigateByUrl('/login');
+    // El backend limpia la cookie HttpOnly; pase lo que pase se descarta la sesion local.
+    this.http.post(`${environment.apiUrl}/auth/logout`, {}).subscribe({
+      next: () => this.clearSession(),
+      error: () => this.clearSession()
+    });
   }
 
   hasRole(roles: Rol[]) {
@@ -37,8 +39,10 @@ export class AuthService {
     return !!current && roles.includes(current.rol);
   }
 
-  token() {
-    return this.sessionSignal()?.token;
+  private clearSession() {
+    localStorage.removeItem(this.key);
+    this.sessionSignal.set(null);
+    this.router.navigateByUrl('/login');
   }
 
   private readSession(): Session | null {

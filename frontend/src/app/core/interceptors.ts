@@ -5,9 +5,9 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { NotifyService } from '../shared/notify.service';
 
-export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = inject(AuthService).token();
-  return next(token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req);
+// El JWT viaja en una cookie HttpOnly; basta con enviar las credenciales en cada peticion.
+export const credentialsInterceptor: HttpInterceptorFn = (req, next) => {
+  return next(req.clone({ withCredentials: true }));
 };
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {

@@ -34,8 +34,9 @@ public class ProductoController {
   public ResponseEntity<?> list(@RequestParam(required = false) String categoria,
                                 @RequestParam(required = false) String nombre,
                                 @RequestParam(required = false) Boolean stockBajo,
+                                @RequestParam(required = false) Boolean activo,
                                 Pageable pageable) {
-    return ResponseEntity.ok(service.list(categoria, nombre, stockBajo, pageable));
+    return ResponseEntity.ok(service.list(categoria, nombre, stockBajo, activo, pageable));
   }
 
   @GetMapping("/stock-bajo")
@@ -67,6 +68,12 @@ public class ProductoController {
   public ResponseEntity<?> delete(@PathVariable Long id) {
     service.delete(id);
     return ResponseEntity.noContent().build();
+  }
+
+  @PatchMapping("/{id}/reactivar")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<?> reactivar(@PathVariable Long id) {
+    return ResponseEntity.ok(service.reactivar(id));
   }
 
   @PatchMapping("/{id}/ajustar-stock")

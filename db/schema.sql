@@ -34,7 +34,7 @@ CREATE TABLE productos (
 CREATE TABLE proveedores (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   nombre VARCHAR(160) NOT NULL,
-  ruc_nit VARCHAR(80) UNIQUE,
+  ruc_nit VARCHAR(80) NOT NULL UNIQUE,
   email VARCHAR(160),
   telefono VARCHAR(60),
   direccion VARCHAR(255),

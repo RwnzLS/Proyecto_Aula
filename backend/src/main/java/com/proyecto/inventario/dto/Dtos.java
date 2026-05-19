@@ -20,10 +20,11 @@ public final class Dtos {
 
   public record LoginRequest(@Email String email, @NotBlank String password) {}
   public record LoginResponse(String token, String nombre, String email, Rol rol) {}
+  public record SessionResponse(String nombre, String email, Rol rol) {}
   public record UserRequest(@NotBlank String nombre, @Email String email, @NotBlank String password, @NotNull Rol rol, Boolean activo) {}
   public record UsuarioResponse(Long id, String nombre, String email, Rol rol, boolean activo, Instant fechaCreacion) {}
   public record ProductoRequest(@NotBlank String nombre, String descripcion, @NotBlank String codigo, String categoria, @Min(0) Integer cantidadStock, @Min(0) Integer stockMinimo, String unidadMedida, Boolean activo) {}
-  public record ProveedorRequest(@NotBlank String nombre, String rucNit, @Email String email, String telefono, String direccion, Boolean activo) {}
+  public record ProveedorRequest(@NotBlank String nombre, @NotBlank String rucNit, @Email String email, String telefono, String direccion, Boolean activo) {}
   public record AjusteStockRequest(@NotNull Integer cantidad, @NotBlank String motivo) {}
   public record MovimientoStockRequest(@NotNull Long productoId, @Min(1) Integer cantidad, @NotBlank String referencia) {}
   public record PrecioRequest(@NotNull Long proveedorId, @NotNull Long productoId, @DecimalMin("0.0") BigDecimal precioUnitario, String moneda) {}
