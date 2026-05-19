@@ -34,7 +34,7 @@ Credenciales iniciales:
 DB_URL=jdbc:mysql://localhost:3306/inventario_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
 DB_USERNAME=root
 DB_PASSWORD=root
-JWT_SECRET=change-this-secret-key-with-at-least-32-characters
+JWT_SECRET=<valor-aleatorio-de-al-menos-32-caracteres>
 MAIL_HOST=localhost
 MAIL_PORT=1025
 MAIL_USERNAME=
@@ -42,6 +42,8 @@ MAIL_PASSWORD=
 MAIL_FROM=no-reply@inventario.local
 OPS_EMAIL=admin@inventario.local
 ```
+
+`JWT_SECRET` es obligatorio. El backend no arranca si falta, mide menos de 32 caracteres o usa el placeholder inseguro anterior.
 
 ## Ejecutar backend
 

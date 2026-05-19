@@ -12,6 +12,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -35,6 +36,7 @@ public class AuthService {
     return new LoginResponse(jwt.generate(usuario), usuario.getNombre(), usuario.getEmail(), usuario.getRol());
   }
 
+  @Transactional
   public UsuarioResponse create(UserRequest request) {
     Usuario usuario = new Usuario();
     usuario.setNombre(request.nombre());
@@ -44,7 +46,7 @@ public class AuthService {
     usuario.setActivo(request.activo() == null || request.activo());
     Usuario saved = usuarios.save(usuario);
     email.sendTemplate(saved.getEmail(), "Bienvenido al sistema", "bienvenida",
-      Map.of("nombre", saved.getNombre(), "email", saved.getEmail(), "passwordTemporal", request.password()));
+      Map.of("nombre", saved.getNombre(), "email", saved.getEmail()));
     return toResponse(saved);
   }
 
