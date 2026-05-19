@@ -47,6 +47,7 @@ public class PrecioService {
       .orElseThrow(() -> new NotFoundException("Precio no encontrado para el producto y proveedor"));
   }
 
+  @Transactional
   public PrecioProveedor create(PrecioRequest request) {
     PrecioProveedor precio = new PrecioProveedor();
     Producto producto = productos.findById(request.productoId()).orElseThrow(() -> new NotFoundException("Producto no encontrado"));

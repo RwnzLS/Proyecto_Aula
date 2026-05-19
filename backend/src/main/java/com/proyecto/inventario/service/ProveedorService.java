@@ -32,6 +32,7 @@ public class ProveedorService {
     return proveedores.findById(id).orElseThrow(() -> new NotFoundException("Proveedor no encontrado"));
   }
 
+  @Transactional
   public Proveedor save(ProveedorRequest request, Long id) {
     Proveedor proveedor = id == null ? new Proveedor() : get(id);
     proveedor.setNombre(request.nombre());
@@ -43,6 +44,7 @@ public class ProveedorService {
     return proveedores.save(proveedor);
   }
 
+  @Transactional
   public void delete(Long id) {
     Proveedor proveedor = get(id);
     proveedor.setActivo(false);

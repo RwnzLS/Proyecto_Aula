@@ -56,18 +56,21 @@ public class ProductoService {
     ));
   }
 
+  @Transactional
   public Producto create(ProductoRequest request) {
     Producto producto = new Producto();
     copyCreate(request, producto);
     return productos.save(producto);
   }
 
+  @Transactional
   public Producto update(Long id, ProductoRequest request) {
     Producto producto = get(id);
     copyUpdate(request, producto);
     return productos.save(producto);
   }
 
+  @Transactional
   public void delete(Long id) {
     Producto producto = get(id);
     producto.setActivo(false);
