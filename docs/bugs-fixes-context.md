@@ -53,23 +53,15 @@ Si un hallazgo se verifica como falso positivo o requiere decision de producto, 
   - Cambios: `MovimientoService` usa `app.time-zone`; default `America/Bogota`; README documenta `APP_TIME_ZONE`.
   - Verificacion: `mvn test`.
 
+- [x] #9 / #12 / #18 / #19 - Pendientes de seguridad e inventario.
+  - Commit: `ce407a4 fix: completar pendientes de seguridad e inventario`
+  - Cambios #12 (JWT en cookie HttpOnly): nuevo `AuthCookie.java` genera cookie `HttpOnly/Secure/SameSite=Strict`; login responde JWT en `Set-Cookie`, logout la limpia; `JwtAuthFilter` lee cookie + fallback Authorization header para Swagger; frontend usa `withCredentials` en `credentialsInterceptor`.
+  - Cambios #18 (RUC/NIT obligatorio): `@NotBlank` + `nullable=false` en `Proveedor.rucNit`; migracion `migration-018-ruc-nit-obligatorio.sql`; validacion `required` en formulario frontend.
+  - Cambios #19 (listado de inactivos): parametro `activo` en `GET /api/productos`; endpoint `PATCH /{id}/reactivar` (ADMIN); filtro Estado (Activos/Inactivos) y boton Reactivar en frontend.
+  - Cambios #9 (notificacion stock bajo en recepcion): `OrdenService.recepcion()` notifica con `productoService.notifyStock()` si tras recepcion el producto queda ≤ stockMinimo.
+  - Tests: `JwtAuthFilterTest`, `InventarioServiceTest`, `OrdenServiceTest`.
+
 ## Pendientes reales o decisiones de arquitectura
-
-- [ ] #12 - JWT en `localStorage`.
-  - Riesgo: XSS puede leer el token.
-  - Siguiente paso sugerido: cambiar backend/frontend a cookie `HttpOnly`, `Secure`, `SameSite`; ajustar login/logout, interceptor y `JwtAuthFilter`.
-  - Importante: esto es cambio de arquitectura auth; no mezclar con fixes pequenos.
-
-- [ ] #18 - `Proveedor.rucNit` es `UNIQUE` pero nullable.
-  - Decision requerida: si RUC/NIT debe ser obligatorio, agregar `@NotBlank`, `nullable = false` y migracion/schema.
-  - Si el negocio permite proveedores sin RUC/NIT, no es bug.
-
-- [ ] #19 - No hay listado principal de productos inactivos.
-  - Decision requerida: si admin debe ver/reactivar inactivos, agregar filtro `activo` o endpoint administrativo.
-  - Esto es mejora funcional, no bug de seguridad.
-
-- [ ] #9 - Notificacion de stock bajo durante recepcion.
-  - Decision requerida: recibir mercancia aumenta stock; solo tiene sentido notificar si el producto sigue bajo minimo tras recepcion y el negocio quiere ese aviso.
 
 ## Hallazgos verificados como falso positivo o no-bug actual
 
