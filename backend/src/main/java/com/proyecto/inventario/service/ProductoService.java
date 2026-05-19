@@ -40,8 +40,9 @@ public class ProductoService {
   }
 
   @Transactional(readOnly = true)
-  public Page<Producto> list(String categoria, String nombre, Boolean stockBajo, Pageable pageable) {
-    Specification<Producto> spec = (root, query, cb) -> cb.isTrue(root.get("activo"));
+  public Page<Producto> list(String categoria, String nombre, Boolean stockBajo, Boolean activo, Pageable pageable) {
+    boolean soloActivos = activo == null || activo;
+    Specification<Producto> spec = (root, query, cb) -> cb.equal(root.get("activo"), soloActivos);
     if (categoria != null && !categoria.isBlank()) spec = spec.and((r, q, cb) -> cb.equal(r.get("categoria"), categoria));
     if (nombre != null && !nombre.isBlank()) spec = spec.and((r, q, cb) -> cb.like(cb.lower(r.get("nombre")), "%" + nombre.toLowerCase() + "%"));
     if (Boolean.TRUE.equals(stockBajo)) spec = spec.and((r, q, cb) -> cb.lessThanOrEqualTo(r.get("cantidadStock"), r.get("stockMinimo")));
@@ -75,6 +76,13 @@ public class ProductoService {
     Producto producto = get(id);
     producto.setActivo(false);
     productos.save(producto);
+  }
+
+  @Transactional
+  public Producto reactivar(Long id) {
+    Producto producto = get(id);
+    producto.setActivo(true);
+    return productos.save(producto);
   }
 
   @Transactional(readOnly = true)

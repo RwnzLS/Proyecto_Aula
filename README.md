@@ -90,8 +90,9 @@ La URL del API se configura en `frontend/src/environments/environment.ts`.
 - `GET /api/usuarios`
 - `POST /api/usuarios`
 - `PATCH /api/usuarios/{id}/activo`
-- `GET /api/productos`
+- `GET /api/productos` con filtros `nombre`, `categoria`, `stockBajo`, `activo`
 - `GET /api/productos/stock-bajo`
+- `PATCH /api/productos/{id}/reactivar`
 - `PATCH /api/productos/{id}/ajustar-stock`
 - `GET /api/proveedores`
 - `GET /api/precios/historial`

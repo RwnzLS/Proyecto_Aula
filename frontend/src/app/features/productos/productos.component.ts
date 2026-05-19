@@ -90,6 +90,15 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
               <mat-option [value]="false">No</mat-option>
             </mat-select>
           </mat-form-field>
+          @if (can(['ADMIN'])) {
+            <mat-form-field appearance="outline">
+              <mat-label>Estado</mat-label>
+              <mat-select formControlName="activo">
+                <mat-option [value]="true">Activos</mat-option>
+                <mat-option [value]="false">Inactivos</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
         </form>
         <div class="panel-actions">
           <button mat-stroked-button type="button" (click)="limpiarFiltros()">
@@ -150,6 +159,10 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
                   <mat-icon>inventory</mat-icon>
                   <span>Ajustar stock</span>
                 </button>
+                <button mat-menu-item *ngIf="can(['ADMIN']) && !row.activo" (click)="reactivar(row)">
+                  <mat-icon>restart_alt</mat-icon>
+                  <span>Reactivar</span>
+                </button>
               </mat-menu>
             </ng-container>
             <ng-template #accionesInline>
@@ -159,6 +172,9 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
                 </button>
                 <button *ngIf="can(['ADMIN','ALMACENISTA'])" mat-icon-button title="Ajustar stock" (click)="ajustar(row)">
                   <mat-icon>inventory</mat-icon>
+                </button>
+                <button *ngIf="can(['ADMIN']) && !row.activo" mat-icon-button title="Reactivar" (click)="reactivar(row)">
+                  <mat-icon>restart_alt</mat-icon>
                 </button>
               </div>
             </ng-template>
@@ -222,7 +238,7 @@ export class ProductosComponent implements OnInit {
   productosPage?: Page<Producto>;
   pageIndex = 0;
   pageSize = 20;
-  productoFiltro = this.fb.group({ nombre: [''], categoria: [''], stockBajo: [null as boolean | null] });
+  productoFiltro = this.fb.group({ nombre: [''], categoria: [''], stockBajo: [null as boolean | null], activo: [true as boolean | null] });
 
   readonly isMobile = toSignal(
     this.breakpoint.observe('(max-width: 768px)').pipe(map(state => state.matches)),
@@ -279,6 +295,7 @@ export class ProductosComponent implements OnInit {
     if (value.categoria) parts.push(`categoria: ${value.categoria}`);
     if (value.stockBajo === true) parts.push('stock bajo');
     if (value.stockBajo === false) parts.push('stock ok');
+    if (value.activo === false) parts.push('inactivos');
     return parts.length ? parts.join(' - ') : 'Sin filtros activos';
   }
 
@@ -303,7 +320,7 @@ export class ProductosComponent implements OnInit {
   }
 
   limpiarFiltros() {
-    this.productoFiltro.reset({ nombre: '', categoria: '', stockBajo: null }, { emitEvent: false });
+    this.productoFiltro.reset({ nombre: '', categoria: '', stockBajo: null, activo: true }, { emitEvent: false });
     this.loadProductos(0, this.pageSize);
   }
 
@@ -331,6 +348,13 @@ export class ProductosComponent implements OnInit {
         this.notify.success('Stock ajustado');
         this.loadProductos();
       });
+    });
+  }
+
+  reactivar(producto: Producto) {
+    this.api.reactivarProducto(producto.id).subscribe(() => {
+      this.notify.success('Producto reactivado');
+      this.loadProductos();
     });
   }
 }

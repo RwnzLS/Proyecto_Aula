@@ -35,8 +35,8 @@ import { Proveedor } from '../../core/models';
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>RUC/NIT</mat-label>
-            <input matInput formControlName="rucNit">
-            <mat-hint>Identificador tributario opcional.</mat-hint>
+            <input matInput formControlName="rucNit" required>
+            <mat-error *ngIf="form.controls.rucNit.hasError('required')">RUC/NIT es obligatorio.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Telefono</mat-label>
@@ -86,7 +86,7 @@ import { Proveedor } from '../../core/models';
 export class ProveedorFormDialogComponent {
   form = this.fb.nonNullable.group({
     nombre: ['', [Validators.required, Validators.maxLength(120)]],
-    rucNit: [''],
+    rucNit: ['', Validators.required],
     email: ['', Validators.email],
     telefono: [''],
     direccion: [''],
