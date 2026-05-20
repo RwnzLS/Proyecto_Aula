@@ -3,7 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { debounceTime, map } from 'rxjs';
+import { catchError, debounceTime, finalize, map, of, timeout } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -199,7 +199,7 @@ export class MovimientosComponent implements OnInit {
 
   readonly columns: TableColumn<MovimientoInventario>[] = [
     { key: 'fecha', header: 'Fecha', sortable: true, value: row => row.fecha },
-    { key: 'producto', header: 'Producto', sortable: true, value: row => row.producto.nombre },
+    { key: 'producto', header: 'Producto', sortable: true, value: row => row.producto?.nombre ?? 'Producto no disponible' },
     { key: 'tipo', header: 'Tipo', sortable: true, value: row => row.tipoMovimiento },
     { key: 'cantidad', header: 'Cantidad', sortable: true, align: 'end', value: row => row.cantidad },
     { key: 'referencia', header: 'Referencia', value: row => row.referencia }
@@ -230,7 +230,10 @@ export class MovimientosComponent implements OnInit {
   }
 
   loadProductos() {
-    this.api.productos({ size: 200 }).subscribe(page => this.productos = page.content);
+    this.api.productos({ size: 200 }).pipe(
+      timeout(8000),
+      catchError(() => of({ content: [] }))
+    ).subscribe(page => this.productos = page.content);
   }
 
   loadMovimientos(page = this.pageIndex, size = this.pageSize) {
@@ -238,14 +241,17 @@ export class MovimientosComponent implements OnInit {
     this.pageSize = size;
     const values = this.filtros.getRawValue();
     this.loading = true;
-    this.api.movimientos({ ...values, page, size }).subscribe({
+    this.api.movimientos({ ...values, page, size }).pipe(
+      timeout(8000),
+      finalize(() => this.loading = false)
+    ).subscribe({
       next: movimientosPage => {
         this.movimientosPage = movimientosPage;
         this.movimientos = movimientosPage.content;
-        this.loading = false;
       },
       error: () => {
-        this.loading = false;
+        this.movimientosPage = undefined;
+        this.movimientos = [];
       }
     });
   }
@@ -311,8 +317,8 @@ export class MovimientosComponent implements OnInit {
     const header = ['Fecha', 'Producto', 'Codigo', 'Tipo', 'Cantidad', 'Referencia'];
     const rows = this.movimientos.map(m => [
       m.fecha,
-      m.producto.nombre,
-      m.producto.codigo,
+      m.producto?.nombre ?? 'Producto no disponible',
+      m.producto?.codigo ?? '',
       m.tipoMovimiento,
       String(m.cantidad),
       m.referencia ?? ''

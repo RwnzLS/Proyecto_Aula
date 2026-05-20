@@ -1,11 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { NgxSkeletonLoaderModule } from 'ngx-skeleton-loader';
 
 @Component({
   selector: 'app-skeleton-table',
   standalone: true,
-  imports: [CommonModule, NgxSkeletonLoaderModule],
+  imports: [CommonModule],
   template: `
     <div
       class="skeleton-table"
@@ -14,20 +13,16 @@ import { NgxSkeletonLoaderModule } from 'ngx-skeleton-loader';
       aria-busy="true"
       [style.--skeleton-columns]="columns">
       <div class="skeleton-row skeleton-header">
-        <ngx-skeleton-loader
-          *ngFor="let _ of columnRange"
-          count="1"
-          appearance="line"
-          [theme]="headerTheme">
-        </ngx-skeleton-loader>
+        <span
+          *ngFor="let _ of columnRange; trackBy: trackByIndex"
+          class="skeleton-line skeleton-line--header">
+        </span>
       </div>
-      <div class="skeleton-row" *ngFor="let _ of rowRange">
-        <ngx-skeleton-loader
-          *ngFor="let __ of columnRange"
-          count="1"
-          appearance="line"
-          [theme]="cellTheme">
-        </ngx-skeleton-loader>
+      <div class="skeleton-row" *ngFor="let _ of rowRange; trackBy: trackByIndex">
+        <span
+          *ngFor="let __ of columnRange; trackBy: trackByIndex"
+          class="skeleton-line">
+        </span>
       </div>
       <span class="sr-only">Cargando datos</span>
     </div>
@@ -44,31 +39,51 @@ import { NgxSkeletonLoaderModule } from 'ngx-skeleton-loader';
       gap: var(--app-space-3);
       grid-template-columns: repeat(var(--skeleton-columns, 4), minmax(0, 1fr));
     }
+    .skeleton-line {
+      display: block;
+      height: 18px;
+      border-radius: 6px;
+      background: var(--app-surface-soft);
+    }
+    .skeleton-line--header {
+      height: 14px;
+      background: var(--app-surface-muted);
+    }
   `]
 })
 export class SkeletonTableComponent {
-  @Input() rows: number = 5;
-  @Input() columns: number = 4;
+  private _rows = 5;
+  private _columns = 4;
 
-  get rowRange(): number[] {
-    return Array.from({ length: this.rows });
+  rowRange = this.range(this._rows);
+  columnRange = this.range(this._columns);
+
+  @Input() set rows(value: number) {
+    this._rows = this.normalizeRangeSize(value, 5);
+    this.rowRange = this.range(this._rows);
   }
 
-  get columnRange(): number[] {
-    return Array.from({ length: this.columns });
+  get rows(): number {
+    return this._rows;
   }
 
-  readonly headerTheme = {
-    height: '14px',
-    'border-radius': '6px',
-    margin: '0',
-    'background-color': 'var(--app-surface-muted)'
-  };
+  @Input() set columns(value: number) {
+    this._columns = this.normalizeRangeSize(value, 4);
+    this.columnRange = this.range(this._columns);
+  }
 
-  readonly cellTheme = {
-    height: '18px',
-    'border-radius': '6px',
-    margin: '0',
-    'background-color': 'var(--app-surface-soft)'
-  };
+  get columns(): number {
+    return this._columns;
+  }
+
+  trackByIndex = (index: number): number => index;
+
+  private range(length: number): number[] {
+    return Array.from({ length }, (_, index) => index);
+  }
+
+  private normalizeRangeSize(value: number | null | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+  }
 }

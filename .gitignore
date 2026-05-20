@@ -8,3 +8,5 @@ frontend/ng-serve*.log
 .env
 .idea/
 .vscode/
+.codegraph/
+.cursor/

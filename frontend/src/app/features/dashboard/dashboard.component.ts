@@ -4,7 +4,7 @@ import { Chart, TooltipItem } from 'chart.js/auto';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { forkJoin, timeout } from 'rxjs';
+import { catchError, finalize, of, timeout } from 'rxjs';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -64,28 +64,23 @@ interface KpiCard {
         <div class="section-heading">
           <span class="eyebrow">KPIs principales</span>
         </div>
-        <ng-container *ngIf="loaded; else kpiSkeleton">
-          <div class="grid kpi-grid">
-            <article *ngFor="let item of kpiCards" class="metric-card" [class]="'metric-card--' + item.tone">
-              <div class="metric-top">
-                <div class="metric-info">
-                  <p class="metric-label">{{ item.label }}</p>
-                  <h2 class="metric-value">{{ item.value }}</h2>
-                </div>
-                <div class="metric-icon" [class]="'metric-icon--' + item.tone">
-                  <mat-icon>{{ item.icon }}</mat-icon>
-                </div>
+        <div class="grid kpi-grid">
+          <article *ngFor="let item of kpiCards" class="metric-card" [class]="'metric-card--' + item.tone">
+            <div class="metric-top">
+              <div class="metric-info">
+                <p class="metric-label">{{ item.label }}</p>
+                <h2 class="metric-value">{{ item.value }}</h2>
               </div>
-              <div class="metric-bottom">
-                <p class="metric-note">{{ item.note }}</p>
-                <span *ngIf="item.trend" class="metric-trend">{{ item.trend }}</span>
+              <div class="metric-icon" [class]="'metric-icon--' + item.tone">
+                <mat-icon>{{ item.icon }}</mat-icon>
               </div>
-            </article>
-          </div>
-        </ng-container>
-        <ng-template #kpiSkeleton>
-          <app-skeleton-table [rows]="1" [columns]="4"></app-skeleton-table>
-        </ng-template>
+            </div>
+            <div class="metric-bottom">
+              <p class="metric-note">{{ item.note }}</p>
+              <span *ngIf="item.trend" class="metric-trend">{{ item.trend }}</span>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section class="dashboard-section">
@@ -145,7 +140,7 @@ interface KpiCard {
             <app-data-table
               [columns]="criticosColumns"
               [rows]="productosCriticos"
-              [loading]="loading && !loaded"
+              [loading]="false"
               [paginator]="false"
               [emptyState]="criticosEmpty">
               <ng-template [appCellDef]="'stock'" let-row>
@@ -176,11 +171,11 @@ interface KpiCard {
             <app-data-table
               [columns]="actividadColumns"
               [rows]="actividadReciente"
-              [loading]="loading && !loaded"
+              [loading]="false"
               [paginator]="false"
               [emptyState]="actividadEmpty">
               <ng-template [appCellDef]="'fecha'" let-row>{{ row.fecha | date:'short' }}</ng-template>
-              <ng-template [appCellDef]="'producto'" let-row>{{ row.producto.nombre }}</ng-template>
+              <ng-template [appCellDef]="'producto'" let-row>{{ row.producto?.nombre || 'Producto no disponible' }}</ng-template>
               <ng-template [appCellDef]="'tipo'" let-row>
                 <span [class]="'status-pill status-pill--' + chipMovimiento(row.tipoMovimiento)">{{ row.tipoMovimiento }}</span>
               </ng-template>
@@ -461,8 +456,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('salesChart') salesChartCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = false;
-  loaded = false;
-  kpis?: DashboardKpi;
+  loaded = true;
+  kpis: DashboardKpi = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
   stockTotalResumen = 0;
   ventasTotalResumen = 0;
   productos: Producto[] = [];
@@ -481,7 +476,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly actividadColumns: TableColumn<MovimientoInventario>[] = [
     { key: 'fecha', header: 'Fecha', value: row => row.fecha },
-    { key: 'producto', header: 'Producto', value: row => row.producto.nombre },
+    { key: 'producto', header: 'Producto', value: row => row.producto?.nombre ?? 'Producto no disponible' },
     { key: 'tipo', header: 'Tipo', value: row => row.tipoMovimiento },
     { key: 'cantidad', header: 'Cant.', align: 'end', value: row => row.cantidad }
   ];
@@ -517,7 +512,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get kpiCards(): KpiCard[] {
-    const k = this.kpis ?? { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
+    const k = this.kpis;
     return [
       { label: 'Stock', value: this.stockTotalResumen, icon: 'inventory_2', tone: 'stock', note: `${k.totalProductos} referencias activas en catalogo.` },
       { label: 'Ventas', value: this.ventasTotalResumen, icon: 'point_of_sale', tone: 'sales', note: 'Salidas registradas desde movimientos.' },
@@ -546,40 +541,52 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   load() {
     this.loading = true;
-    forkJoin({
-      resumen: this.api.dashboardResumen(),
-      productos: this.api.productos({ size: 200 })
-    }).pipe(timeout(15000)).subscribe({
-      next: ({ resumen, productos }) => {
+    this.api.dashboardResumen().pipe(
+      timeout(8000),
+      catchError(() => {
+        this.resetDashboard();
+        this.notify.error('No se pudo cargar el dashboard');
+        return of(null);
+      }),
+      finalize(() => {
+        this.loading = false;
+        this.loaded = true;
+        this.renderCharts();
+      })
+    ).subscribe(resumen => {
+      if (resumen) {
         this.kpis = resumen.kpis;
         this.stockTotalResumen = resumen.stockTotal;
         this.ventasTotalResumen = resumen.ventasTotal;
-        this.productos = productos.content;
         this.productosCriticos = resumen.productosCriticos;
         this.movimientos = resumen.actividadReciente;
         this.movimientosPorTipo = resumen.movimientosPorTipo;
         this.actividadReciente = resumen.actividadReciente;
         this.topSales = resumen.topVentas.map(item => ({ producto: item.producto, cantidad: item.cantidad }));
-        this.loading = false;
-        this.loaded = true;
-        this.renderCharts();
-      },
-      error: () => {
-        this.loading = false;
-        this.loaded = true;
-        this.kpis = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
-        this.stockTotalResumen = 0;
-        this.ventasTotalResumen = 0;
-        this.productos = [];
-        this.productosCriticos = [];
-        this.movimientos = [];
-        this.movimientosPorTipo = [];
-        this.actividadReciente = [];
-        this.topSales = [];
-        this.renderCharts();
-        this.notify.error('No se pudo cargar el dashboard');
       }
     });
+
+    this.loadProductosForActions();
+  }
+
+  private loadProductosForActions() {
+    this.api.productos({ size: 200 }).pipe(
+      timeout(8000),
+      catchError(() => of({ content: [] }))
+    ).subscribe(productos => {
+      this.productos = productos.content;
+    });
+  }
+
+  private resetDashboard() {
+    this.kpis = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
+    this.stockTotalResumen = 0;
+    this.ventasTotalResumen = 0;
+    this.productosCriticos = [];
+    this.movimientos = [];
+    this.movimientosPorTipo = [];
+    this.actividadReciente = [];
+    this.topSales = [];
   }
 
   agregarProducto() {

@@ -1,5 +1,6 @@
 package com.proyecto.inventario.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -30,6 +31,7 @@ public class DetalleOrden {
   private BigDecimal precioUnitario;
 
   public Long getId() { return id; }
+  @JsonIgnore
   public OrdenCompra getOrden() { return orden; }
   public void setOrden(OrdenCompra orden) { this.orden = orden; }
   public Producto getProducto() { return producto; }

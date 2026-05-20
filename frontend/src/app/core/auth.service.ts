@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, catchError, of, tap } from 'rxjs';
+import { Observable, catchError, of, tap, timeout } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Rol } from './models';
 
@@ -33,6 +33,7 @@ export class AuthService {
    */
   verifySession(): Observable<Session | null> {
     return this.http.get<Session>(`${environment.apiUrl}/auth/session`).pipe(
+      timeout(5000),
       tap(session => this.storeSession(session)),
       catchError(() => {
         this.clearLocalSession();
@@ -76,7 +77,30 @@ export class AuthService {
   }
 
   private readSession(): Session | null {
+    if (this.shouldResetSessionFromUrl()) {
+      localStorage.removeItem(this.key);
+      return null;
+    }
     const raw = localStorage.getItem(this.key);
-    return raw ? JSON.parse(raw) as Session : null;
+    if (!raw) return null;
+    try {
+      const session = JSON.parse(raw) as Partial<Session>;
+      if (
+        typeof session.nombre === 'string' &&
+        typeof session.email === 'string' &&
+        (session.rol === 'ADMIN' || session.rol === 'GERENTE' || session.rol === 'ALMACENISTA')
+      ) {
+        return session as Session;
+      }
+    } catch {
+      // Sesiones antiguas o corruptas no deben romper el bootstrap de Angular.
+    }
+    localStorage.removeItem(this.key);
+    return null;
+  }
+
+  private shouldResetSessionFromUrl(): boolean {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).has('resetSession');
   }
 }
