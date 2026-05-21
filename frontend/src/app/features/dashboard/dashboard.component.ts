@@ -556,10 +556,28 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private theme: ThemeService,
     private router: Router
   ) {
+    console.log('[Dashboard] constructor');
     effect(() => {
       this.theme.isDark();
       this.renderCharts();
     });
+  }
+
+  ngOnInit() {
+    console.log('[Dashboard] ngOnInit');
+    this.load();
+  }
+
+  ngAfterViewInit() {
+    console.log('[Dashboard] ngAfterViewInit');
+    this.viewReady = true;
+    this.renderCharts();
+  }
+
+  ngOnDestroy() {
+    console.log('[Dashboard] ngOnDestroy');
+    this.movementsChart?.destroy();
+    this.salesChart?.destroy();
   }
 
   get kpiCards(): KpiCard[] {
@@ -591,21 +609,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   load() {
+    console.log('[Dashboard] load() start');
     this.loading = true;
     this.api.dashboardResumen().pipe(
       timeout(8000),
       catchError((err: HttpErrorResponse) => {
+        console.error('[Dashboard] API error', err.status, err.message);
         this.resetDashboard();
         const msg = err.error?.message ?? (err.status === 0 ? 'Backend no disponible' : 'No se pudo cargar el dashboard');
         this.notify.error(msg);
         return of(null);
       }),
       finalize(() => {
+        console.log('[Dashboard] load() finalize');
         this.loading = false;
         this.loaded = true;
         this.renderCharts();
       })
     ).subscribe(resumen => {
+      console.log('[Dashboard] load() data received', resumen ? 'OK' : 'null');
       if (resumen) {
         this.kpis = resumen.kpis;
         this.stockTotalResumen = resumen.stockTotal;
@@ -680,11 +702,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private renderCharts() {
     if (!this.viewReady) return;
+    console.log('[Dashboard] renderCharts');
     try {
       this.renderMovementsChart();
       this.renderSalesChart();
     } catch (err) {
-      console.error('Dashboard chart render failed', err);
+      console.error('[Dashboard] renderCharts error', err);
     }
   }
 
@@ -694,6 +717,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.movementsChart = undefined;
       return;
     }
+    console.log('[Dashboard] renderMovementsChart');
     this.movementsChart?.destroy();
     const byType = this.movimientosPorTipo.reduce((acc, movimiento) => {
       acc.set(movimiento.tipoMovimiento, movimiento.cantidad);
@@ -739,6 +763,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    console.log('[Dashboard] renderSalesChart');
     this.salesChart?.destroy();
     this.salesChart = new Chart(this.salesChartCanvas.nativeElement, {
       type: 'bar',
