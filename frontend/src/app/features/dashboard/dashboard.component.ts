@@ -590,20 +590,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
 
-  ngOnInit() {
-    this.load();
-  }
-
-  ngAfterViewInit() {
-    this.viewReady = true;
-    this.renderCharts();
-  }
-
-  ngOnDestroy() {
-    this.movementsChart?.destroy();
-    this.salesChart?.destroy();
-  }
-
   can(roles: Rol[]) {
     return this.auth.hasRole(roles);
   }
