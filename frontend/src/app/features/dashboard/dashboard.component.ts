@@ -1,7 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
-import { Chart, TooltipItem, registerables } from 'chart.js';
-Chart.register(...registerables);
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -545,8 +543,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     message: 'Las entradas, salidas y ajustes apareceran aqui.'
   };
 
-  private movementsChart?: Chart;
-  private salesChart?: Chart;
+  private movementsChart?: any;
+  private salesChart?: any;
+  private ChartLib: any = null;
   private viewReady = false;
 
   constructor(
@@ -557,7 +556,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private theme: ThemeService,
     private router: Router
   ) {
-    console.log('[Dashboard] constructor');
     effect(() => {
       this.theme.isDark();
       this.renderCharts();
@@ -565,18 +563,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
-    console.log('[Dashboard] ngOnInit');
     this.load();
   }
 
   ngAfterViewInit() {
-    console.log('[Dashboard] ngAfterViewInit');
     this.viewReady = true;
     this.renderCharts();
   }
 
   ngOnDestroy() {
-    console.log('[Dashboard] ngOnDestroy');
     this.movementsChart?.destroy();
     this.salesChart?.destroy();
   }
@@ -608,7 +603,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         return of(null);
       }),
       finalize(() => {
-        console.log('[Dashboard] load() finalize');
         this.loading = false;
         this.loaded = true;
         this.renderCharts();
@@ -687,114 +681,98 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'primary';
   }
 
-  private renderCharts() {
+  private async renderCharts() {
     if (!this.viewReady) return;
-    console.log('[Dashboard] renderCharts');
     try {
+      if (!this.ChartLib) {
+        this.ChartLib = await import('chart.js/auto');
+      }
       this.renderMovementsChart();
       this.renderSalesChart();
     } catch (err) {
-      console.error('[Dashboard] renderCharts error', err);
+      console.error('[Dashboard] chart error', err);
     }
   }
 
   private renderMovementsChart() {
-    if (!this.movementsChartCanvas || !this.movimientosPorTipo.length) {
+    if (!this.ChartLib || !this.movementsChartCanvas || !this.movimientosPorTipo.length) {
       this.movementsChart?.destroy();
       this.movementsChart = undefined;
       return;
     }
-    console.log('[Dashboard] renderMovementsChart');
     this.movementsChart?.destroy();
-    const byType = this.movimientosPorTipo.reduce((acc, movimiento) => {
-      acc.set(movimiento.tipoMovimiento, movimiento.cantidad);
+    const byType = this.movimientosPorTipo.reduce((acc: Map<string, number>, m: any) => {
+      acc.set(m.tipoMovimiento, m.cantidad);
       return acc;
     }, new Map<string, number>());
     const labels = [...byType.keys()];
     const values = [...byType.values()];
 
-    try {
-      this.movementsChart = new Chart(this.movementsChartCanvas.nativeElement, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{
-            data: values,
-            backgroundColor: ['#2f855a', '#c47a1c', '#2f6fab'],
-            borderColor: '#ffffff',
-            borderWidth: 3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '62%',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx: TooltipItem<'doughnut'>) => `${ctx.label}: ${ctx.parsed} unidades`
-              }
+    this.movementsChart = new this.ChartLib.Chart(this.movementsChartCanvas.nativeElement, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: ['#2f855a', '#c47a1c', '#2f6fab'],
+          borderColor: '#ffffff',
+          borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx: any) => `${ctx.label}: ${ctx.parsed} unidades`
             }
           }
         }
-      });
-      console.log('[Dashboard] movementsChart created OK');
-    } catch (err) {
-      console.error('[Dashboard] movementsChart creation failed', err);
-    }
+      }
+    });
   }
 
   private renderSalesChart() {
-    if (!this.salesChartCanvas || !this.topSales.length) {
+    if (!this.ChartLib || !this.salesChartCanvas || !this.topSales.length) {
       this.salesChart?.destroy();
       return;
     }
 
-    console.log('[Dashboard] renderSalesChart');
     this.salesChart?.destroy();
-    try {
-      this.salesChart = new Chart(this.salesChartCanvas.nativeElement, {
-        type: 'bar',
-        data: {
-          labels: this.topSales.map(item => item.producto),
-          datasets: [{
-            label: 'Salidas',
-            data: this.topSales.map(item => item.cantidad),
-            backgroundColor: '#00796b',
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx: TooltipItem<'bar'>) => {
-                  const value = Number(ctx.parsed.y ?? 0);
-                  return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
-                }
+    this.salesChart = new this.ChartLib.Chart(this.salesChartCanvas.nativeElement, {
+      type: 'bar',
+      data: {
+        labels: this.topSales.map(item => item.producto),
+        datasets: [{
+          label: 'Salidas',
+          data: this.topSales.map(item => item.cantidad),
+          backgroundColor: '#00796b',
+          borderRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx: any) => {
+                const value = Number(ctx.parsed?.y ?? 0);
+                return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
               }
             }
-          },
-          scales: {
-            x: {
-              ticks: { color: '#667775' },
-              grid: { color: '#dfe7e4' }
-            },
-            y: {
-              beginAtZero: true,
-              ticks: { color: '#667775', precision: 0 },
-              grid: { color: '#dfe7e4' }
-            }
           }
+        },
+        scales: {
+          x: { ticks: { color: '#667775' }, grid: { color: '#dfe7e4' } },
+          y: { beginAtZero: true, ticks: { color: '#667775', precision: 0 }, grid: { color: '#dfe7e4' } }
         }
-      });
-      console.log('[Dashboard] salesChart created OK');
-    } catch (err) {
-      console.error('[Dashboard] salesChart creation failed', err);
-    }
+      }
+    });
   }
+
 }
