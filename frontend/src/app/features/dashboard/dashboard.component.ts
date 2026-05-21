@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -104,38 +104,48 @@ interface KpiCard {
           <span class="eyebrow">Graficas</span>
         </div>
         <div class="dashboard-charts">
-          <article class="chart-box dashboard-chart">
+          <article class="chart-box">
             <div class="panel-title">
-              <h2>Movimientos</h2>
-              <p>Distribucion por tipo en los ultimos registros.</p>
+              <h2>Movimientos por tipo</h2>
+              <p>Distribucion en los ultimos registros.</p>
             </div>
-            <div class="doughnut-layout">
-              <div class="doughnut-canvas">
-                <canvas #movementsChart></canvas>
+            <div class="css-bars" *ngIf="movimientosPorTipo.length; else sinMovimientos">
+              <div class="css-bar-row" *ngFor="let item of movimientosPorTipo">
+                <span class="css-bar-label">{{ item.tipoMovimiento }}</span>
+                <div class="css-bar-track">
+                  <div class="css-bar-fill" [class]="'css-bar-fill--' + chipMovimiento(item.tipoMovimiento)" [style.width.%]="barPercent(item.cantidad)"></div>
+                </div>
+                <span class="css-bar-value">{{ item.cantidad }}</span>
               </div>
-              <ul class="doughnut-legend" *ngIf="movimientosPorTipo.length; else sinMovimientos">
-                <li *ngFor="let item of movimientosPorTipo">
-                  <span class="legend-dot" [class]="'legend-dot--' + chipMovimiento(item.tipoMovimiento)"></span>
-                  <span class="legend-label">{{ item.tipoMovimiento }}</span>
-                  <span class="legend-value">{{ item.cantidad }} <small>unidades</small></span>
-                </li>
-              </ul>
-              <ng-template #sinMovimientos>
-                <p class="doughnut-empty">Sin movimientos registrados aun.</p>
-              </ng-template>
             </div>
+            <ng-template #sinMovimientos>
+              <div class="empty-state compact">
+                <mat-icon>bar_chart</mat-icon>
+                <h3>Sin movimientos registrados</h3>
+              </div>
+            </ng-template>
           </article>
-          <article class="chart-box dashboard-chart">
+          <article class="chart-box">
             <div class="panel-title">
               <h2>Productos mas vendidos</h2>
-              <p>Ranking calculado con movimientos de tipo SALIDA.</p>
+              <p>Ranking por movimientos de tipo SALIDA.</p>
             </div>
-            <canvas #salesChart [class.hidden-chart]="!topSales.length"></canvas>
-            <div *ngIf="!topSales.length" class="empty-state compact">
-              <mat-icon>point_of_sale</mat-icon>
-              <h3>Sin salidas registradas</h3>
-              <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
+            <div class="css-bars" *ngIf="topSales.length; else sinVentas">
+              <div class="css-bar-row" *ngFor="let item of topSales">
+                <span class="css-bar-label">{{ item.producto }}</span>
+                <div class="css-bar-track">
+                  <div class="css-bar-fill css-bar-fill--primary" [style.width.%]="barPercent(item.cantidad)"></div>
+                </div>
+                <span class="css-bar-value">{{ item.cantidad }}</span>
+              </div>
             </div>
+            <ng-template #sinVentas>
+              <div class="empty-state compact">
+                <mat-icon>point_of_sale</mat-icon>
+                <h3>Sin salidas registradas</h3>
+                <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
+              </div>
+            </ng-template>
           </article>
         </div>
       </section>
@@ -450,6 +460,55 @@ interface KpiCard {
       font-size: var(--app-font-12);
     }
 
+
+    .css-bars {
+      display: grid;
+      gap: var(--app-space-3);
+      padding: var(--app-space-3) 0;
+    }
+
+    .css-bar-row {
+      display: grid;
+      grid-template-columns: 70px 1fr 50px;
+      align-items: center;
+      gap: var(--app-space-3);
+    }
+
+    .css-bar-label {
+      font-size: var(--app-font-12);
+      font-weight: var(--app-weight-semibold);
+      color: var(--app-muted-strong);
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .css-bar-track {
+      height: 14px;
+      border-radius: var(--app-radius-2);
+      background: var(--app-surface-muted);
+      overflow: hidden;
+    }
+
+    .css-bar-fill {
+      height: 100%;
+      border-radius: var(--app-radius-2);
+      min-width: 4px;
+      transition: width var(--app-dur-slow) var(--app-ease-out);
+    }
+
+    .css-bar-fill--success { background: var(--app-success); }
+    .css-bar-fill--warn { background: var(--app-warning); }
+    .css-bar-fill--primary { background: var(--app-accent); }
+
+    .css-bar-value {
+      font-size: var(--app-font-14);
+      font-weight: var(--app-weight-bold);
+      color: var(--app-heading);
+      font-variant-numeric: tabular-nums;
+    }
+
     .compact {
       min-height: 220px;
     }
@@ -501,9 +560,7 @@ interface KpiCard {
     }
   `]
 })
-export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('movementsChart') movementsChartCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('salesChart') salesChartCanvas?: ElementRef<HTMLCanvasElement>;
+export class DashboardComponent implements OnInit {
 
   loading = false;
   loaded = false;
@@ -543,10 +600,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     message: 'Las entradas, salidas y ajustes apareceran aqui.'
   };
 
-  private movementsChart?: any;
-  private salesChart?: any;
-  private ChartLib: any = null;
-  private viewReady = false;
 
   constructor(
     private api: ApiService,
@@ -555,26 +608,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private notify: NotifyService,
     private theme: ThemeService,
     private router: Router
-  ) {
-    effect(() => {
-      this.theme.isDark();
-      this.renderCharts();
-    });
-  }
+  ) {}
 
   ngOnInit() {
     this.load();
   }
 
-  ngAfterViewInit() {
-    this.viewReady = true;
-    this.renderCharts();
-  }
-
-  ngOnDestroy() {
-    this.movementsChart?.destroy();
-    this.salesChart?.destroy();
-  }
 
   get kpiCards(): KpiCard[] {
     const k = this.kpis;
@@ -605,7 +644,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       finalize(() => {
         this.loading = false;
         this.loaded = true;
-        this.renderCharts();
       })
     ).subscribe(resumen => {
       console.log('[Dashboard] load() data received', resumen ? 'OK' : 'null');
@@ -681,98 +719,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'primary';
   }
 
-  private async renderCharts() {
-    if (!this.viewReady) return;
-    try {
-      if (!this.ChartLib) {
-        this.ChartLib = await import('chart.js/auto');
-      }
-      this.renderMovementsChart();
-      this.renderSalesChart();
-    } catch (err) {
-      console.error('[Dashboard] chart error', err);
-    }
-  }
 
-  private renderMovementsChart() {
-    if (!this.ChartLib || !this.movementsChartCanvas || !this.movimientosPorTipo.length) {
-      this.movementsChart?.destroy();
-      this.movementsChart = undefined;
-      return;
-    }
-    this.movementsChart?.destroy();
-    const byType = this.movimientosPorTipo.reduce((acc: Map<string, number>, m: any) => {
-      acc.set(m.tipoMovimiento, m.cantidad);
-      return acc;
-    }, new Map<string, number>());
-    const labels = [...byType.keys()];
-    const values = [...byType.values()];
-
-    this.movementsChart = new this.ChartLib.Chart(this.movementsChartCanvas.nativeElement, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: ['#2f855a', '#c47a1c', '#2f6fab'],
-          borderColor: '#ffffff',
-          borderWidth: 3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '62%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: any) => `${ctx.label}: ${ctx.parsed} unidades`
-            }
-          }
-        }
-      }
-    });
-  }
-
-  private renderSalesChart() {
-    if (!this.ChartLib || !this.salesChartCanvas || !this.topSales.length) {
-      this.salesChart?.destroy();
-      return;
-    }
-
-    this.salesChart?.destroy();
-    this.salesChart = new this.ChartLib.Chart(this.salesChartCanvas.nativeElement, {
-      type: 'bar',
-      data: {
-        labels: this.topSales.map(item => item.producto),
-        datasets: [{
-          label: 'Salidas',
-          data: this.topSales.map(item => item.cantidad),
-          backgroundColor: '#00796b',
-          borderRadius: 8
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: any) => {
-                const value = Number(ctx.parsed?.y ?? 0);
-                return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: { ticks: { color: '#667775' }, grid: { color: '#dfe7e4' } },
-          y: { beginAtZero: true, ticks: { color: '#667775', precision: 0 }, grid: { color: '#dfe7e4' } }
-        }
-      }
-    });
+  barPercent(value: number): number {
+    const all = [...this.movimientosPorTipo.map(m => m.cantidad), ...this.topSales.map(t => t.cantidad)];
+    const max = all.length ? Math.max(...all, 1) : 1;
+    return Math.round((value / max) * 100);
   }
 
 }
