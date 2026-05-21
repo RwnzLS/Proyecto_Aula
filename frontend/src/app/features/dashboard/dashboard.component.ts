@@ -1,6 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
-import { Chart, TooltipItem } from 'chart.js/auto';
+import { Chart, TooltipItem, registerables } from 'chart.js';
+Chart.register(...registerables);
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -712,35 +713,36 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const labels = [...byType.keys()];
     const values = [...byType.values()];
 
-    this.movementsChart = new Chart(this.movementsChartCanvas.nativeElement, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: [
-            this.cssVar('--app-success', '#2f855a'),
-            this.cssVar('--app-warning', '#c47a1c'),
-            this.cssVar('--app-accent', '#2f6fab')
-          ],
-          borderColor: this.cssVar('--app-surface', '#ffffff'),
-          borderWidth: 3
-        }]
-      },
-      options: {
-        ...this.chartOptions(),
-        cutout: '62%',
-        plugins: {
-          ...this.chartOptions().plugins,
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: TooltipItem<'doughnut'>) => `${ctx.label}: ${ctx.parsed} unidades`
+    try {
+      this.movementsChart = new Chart(this.movementsChartCanvas.nativeElement, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: ['#2f855a', '#c47a1c', '#2f6fab'],
+            borderColor: '#ffffff',
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '62%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: TooltipItem<'doughnut'>) => `${ctx.label}: ${ctx.parsed} unidades`
+              }
             }
           }
         }
-      }
-    });
+      });
+      console.log('[Dashboard] movementsChart created OK');
+    } catch (err) {
+      console.error('[Dashboard] movementsChart creation failed', err);
+    }
   }
 
   private renderSalesChart() {
@@ -751,59 +753,48 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     console.log('[Dashboard] renderSalesChart');
     this.salesChart?.destroy();
-    this.salesChart = new Chart(this.salesChartCanvas.nativeElement, {
-      type: 'bar',
-      data: {
-        labels: this.topSales.map(item => item.producto),
-        datasets: [{
-          label: 'Salidas',
-          data: this.topSales.map(item => item.cantidad),
-          backgroundColor: this.cssVar('--app-brand', '#00796b'),
-          borderRadius: 8
-        }]
-      },
-      options: {
-        ...this.chartOptions(),
-        plugins: {
-          ...this.chartOptions().plugins,
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: TooltipItem<'bar'>) => {
-                const value = Number(ctx.parsed.y ?? 0);
-                return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
+    try {
+      this.salesChart = new Chart(this.salesChartCanvas.nativeElement, {
+        type: 'bar',
+        data: {
+          labels: this.topSales.map(item => item.producto),
+          datasets: [{
+            label: 'Salidas',
+            data: this.topSales.map(item => item.cantidad),
+            backgroundColor: '#00796b',
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: TooltipItem<'bar'>) => {
+                  const value = Number(ctx.parsed.y ?? 0);
+                  return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
+                }
               }
             }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: this.cssVar('--app-muted', '#667775') },
-            grid: { color: this.cssVar('--app-border', '#dfe7e4') }
           },
-          y: {
-            beginAtZero: true,
-            ticks: { color: this.cssVar('--app-muted', '#667775'), precision: 0 },
-            grid: { color: this.cssVar('--app-border', '#dfe7e4') }
+          scales: {
+            x: {
+              ticks: { color: '#667775' },
+              grid: { color: '#dfe7e4' }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#667775', precision: 0 },
+              grid: { color: '#dfe7e4' }
+            }
           }
         }
-      }
-    });
-  }
-
-  private chartOptions() {
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          labels: { color: this.cssVar('--app-muted', '#667775') }
-        }
-      }
-    };
-  }
-
-  private cssVar(name: string, fallback: string) {
-    return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+      });
+      console.log('[Dashboard] salesChart created OK');
+    } catch (err) {
+      console.error('[Dashboard] salesChart creation failed', err);
+    }
   }
 }
