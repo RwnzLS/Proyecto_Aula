@@ -109,15 +109,24 @@ interface KpiCard {
               <h2>Movimientos por tipo</h2>
               <p>Distribucion en los ultimos registros.</p>
             </div>
-            <div class="css-bars" *ngIf="movimientosPorTipo.length; else sinMovimientos">
-              <div class="css-bar-row" *ngFor="let item of movimientosPorTipo">
-                <span class="css-bar-label">{{ item.tipoMovimiento }}</span>
-                <div class="css-bar-track">
-                  <div class="css-bar-fill" [class]="'css-bar-fill--' + chipMovimiento(item.tipoMovimiento)" [style.width.%]="barPercent(item.cantidad)"></div>
+            <ng-container *ngIf="movimientosPorTipo.length; else sinMovimientos">
+              <div class="doughnut-card">
+                <div class="doughnut-ring" [style.background]="doughnutGradient()">
+                  <div class="doughnut-center">
+                    <span class="doughnut-total">{{ totalMovimientos() }}</span>
+                    <small>total unds.</small>
+                  </div>
                 </div>
-                <span class="css-bar-value">{{ item.cantidad }}</span>
+                <ul class="doughnut-legend">
+                  <li *ngFor="let item of movimientosPorTipo; let i = index">
+                    <span class="legend-dot" [class]="'legend-dot--' + chipMovimiento(item.tipoMovimiento)"></span>
+                    <span class="legend-label">{{ item.tipoMovimiento }}</span>
+                    <span class="legend-value">{{ item.cantidad }}</span>
+                    <span class="legend-pct">{{ pctMovimiento(i) }}%</span>
+                  </li>
+                </ul>
               </div>
-            </div>
+            </ng-container>
             <ng-template #sinMovimientos>
               <div class="empty-state compact">
                 <mat-icon>bar_chart</mat-icon>
@@ -127,18 +136,21 @@ interface KpiCard {
           </article>
           <article class="chart-box">
             <div class="panel-title">
-              <h2>Productos mas vendidos</h2>
+              <h2>Top productos mas vendidos</h2>
               <p>Ranking por movimientos de tipo SALIDA.</p>
             </div>
-            <div class="css-bars" *ngIf="topSales.length; else sinVentas">
-              <div class="css-bar-row" *ngFor="let item of topSales">
-                <span class="css-bar-label">{{ item.producto }}</span>
-                <div class="css-bar-track">
-                  <div class="css-bar-fill css-bar-fill--primary" [style.width.%]="barPercent(item.cantidad)"></div>
+            <ul class="ranking-list" *ngIf="topSales.length; else sinVentas">
+              <li class="ranking-item" *ngFor="let item of topSales; let i = index">
+                <span class="ranking-pos" [class]="'ranking-pos--' + (i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '')">{{ i + 1 }}</span>
+                <div class="ranking-body">
+                  <span class="ranking-name">{{ item.producto }}</span>
+                  <div class="ranking-bar-track">
+                    <div class="ranking-bar-fill" [style.width.%]="barPercent(item.cantidad)"></div>
+                  </div>
                 </div>
-                <span class="css-bar-value">{{ item.cantidad }}</span>
-              </div>
-            </div>
+                <span class="ranking-units">{{ item.cantidad }} unds.</span>
+              </li>
+            </ul>
             <ng-template #sinVentas>
               <div class="empty-state compact">
                 <mat-icon>point_of_sale</mat-icon>
@@ -467,46 +479,185 @@ interface KpiCard {
       padding: var(--app-space-3) 0;
     }
 
-    .css-bar-row {
+    .doughnut-card {
       display: grid;
-      grid-template-columns: 70px 1fr 50px;
+      grid-template-columns: auto 1fr;
+      gap: var(--app-space-6);
+      align-items: center;
+      padding: var(--app-space-4) 0;
+    }
+
+    .doughnut-ring {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      position: relative;
+      box-shadow: inset 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .doughnut-ring::before {
+      content: '';
+      position: absolute;
+      inset: 22px;
+      border-radius: 50%;
+      background: var(--app-surface);
+    }
+
+    .doughnut-center {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      display: grid;
+      gap: 2px;
+    }
+
+    .doughnut-total {
+      font-size: 28px;
+      font-weight: var(--app-weight-extrabold);
+      color: var(--app-heading);
+      line-height: 1;
+    }
+
+    .doughnut-center small {
+      font-size: var(--app-font-11);
+      color: var(--app-muted);
+    }
+
+    .doughnut-legend {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: var(--app-space-3);
+    }
+
+    .doughnut-legend li {
+      display: grid;
+      grid-template-columns: 10px 1fr auto auto;
+      align-items: center;
+      gap: var(--app-space-2);
+      font-size: var(--app-font-14);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .legend-dot--success { background: var(--app-success); }
+    .legend-dot--warn { background: var(--app-warning); }
+    .legend-dot--primary { background: var(--app-accent); }
+
+    .legend-label {
+      color: var(--app-text);
+      font-weight: var(--app-weight-medium);
+    }
+
+    .legend-value {
+      color: var(--app-heading);
+      font-weight: var(--app-weight-bold);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .legend-pct {
+      color: var(--app-muted);
+      font-size: var(--app-font-12);
+      font-variant-numeric: tabular-nums;
+      min-width: 38px;
+      text-align: right;
+    }
+
+    /* ranking */
+
+    .ranking-list {
+      list-style: none;
+      margin: 0;
+      padding: var(--app-space-3) 0;
+      display: grid;
+      gap: var(--app-space-3);
+    }
+
+    .ranking-item {
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
       align-items: center;
       gap: var(--app-space-3);
     }
 
-    .css-bar-label {
-      font-size: var(--app-font-12);
-      font-weight: var(--app-weight-semibold);
+    .ranking-pos {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: var(--app-font-13);
+      font-weight: var(--app-weight-extrabold);
       color: var(--app-muted-strong);
-      text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      background: var(--app-surface-muted);
+      flex-shrink: 0;
     }
 
-    .css-bar-track {
-      height: 14px;
-      border-radius: var(--app-radius-2);
+    .ranking-pos--gold {
+      background: linear-gradient(135deg, #f9a825, #fdd835);
+      color: #5d4037;
+      box-shadow: 0 2px 6px rgba(249,168,37,0.3);
+    }
+
+    .ranking-pos--silver {
+      background: linear-gradient(135deg, #90a4ae, #cfd8dc);
+      color: #37474f;
+    }
+
+    .ranking-pos--bronze {
+      background: linear-gradient(135deg, #c17900, #e6a550);
+      color: #fff;
+    }
+
+    .ranking-body {
+      display: grid;
+      gap: var(--app-space-1);
+    }
+
+    .ranking-name {
+      font-size: var(--app-font-14);
+      font-weight: var(--app-weight-semibold);
+      color: var(--app-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ranking-bar-track {
+      height: 8px;
+      border-radius: var(--app-radius-pill);
       background: var(--app-surface-muted);
       overflow: hidden;
     }
 
-    .css-bar-fill {
+    .ranking-bar-fill {
       height: 100%;
-      border-radius: var(--app-radius-2);
+      border-radius: var(--app-radius-pill);
+      background: linear-gradient(90deg, var(--app-brand), var(--app-brand-strong));
       min-width: 4px;
-      transition: width var(--app-dur-slow) var(--app-ease-out);
+      transition: width 0.8s var(--app-ease-out);
     }
 
-    .css-bar-fill--success { background: var(--app-success); }
-    .css-bar-fill--warn { background: var(--app-warning); }
-    .css-bar-fill--primary { background: var(--app-accent); }
-
-    .css-bar-value {
-      font-size: var(--app-font-14);
+    .ranking-units {
+      font-size: var(--app-font-13);
       font-weight: var(--app-weight-bold);
       color: var(--app-heading);
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 520px) {
+      .doughnut-card {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
     }
 
     .compact {
@@ -724,6 +875,32 @@ export class DashboardComponent implements OnInit {
     const all = [...this.movimientosPorTipo.map(m => m.cantidad), ...this.topSales.map(t => t.cantidad)];
     const max = all.length ? Math.max(...all, 1) : 1;
     return Math.round((value / max) * 100);
+  }
+
+  totalMovimientos(): number {
+    return this.movimientosPorTipo.reduce((sum, m) => sum + m.cantidad, 0);
+  }
+
+  pctMovimiento(index: number): number {
+    const total = this.totalMovimientos();
+    if (!total) return 0;
+    return Math.round((this.movimientosPorTipo[index].cantidad / total) * 100);
+  }
+
+  doughnutGradient(): string {
+    const colors: Record<string, string> = {'ENTRADA': '#2f855a', 'SALIDA': '#c47a1c', 'AJUSTE': '#2f6fab'};
+    const items = this.movimientosPorTipo;
+    if (!items.length) return '#eee';
+    let deg = 0;
+    const total = this.totalMovimientos();
+    const segments: string[] = [];
+    for (const item of items) {
+      const pct = (item.cantidad / total) * 100;
+      const color = colors[item.tipoMovimiento] || '#999';
+      segments.push(`${color} ${deg}deg ${deg + pct * 3.6}deg`);
+      deg += pct * 3.6;
+    }
+    return `conic-gradient(${segments.join(', ')})`;
   }
 
 }
