@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, finalize, of, timeout } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -65,21 +66,37 @@ interface KpiCard {
           <span class="eyebrow">KPIs principales</span>
         </div>
         <div class="grid kpi-grid">
-          <article *ngFor="let item of kpiCards" class="metric-card" [class]="'metric-card--' + item.tone">
-            <div class="metric-top">
-              <div class="metric-info">
-                <p class="metric-label">{{ item.label }}</p>
-                <h2 class="metric-value">{{ item.value }}</h2>
+          <ng-container *ngIf="loaded; else skeletonKpis">
+            <article *ngFor="let item of kpiCards" class="metric-card" [class]="'metric-card--' + item.tone">
+              <div class="metric-top">
+                <div class="metric-info">
+                  <p class="metric-label">{{ item.label }}</p>
+                  <h2 class="metric-value">{{ item.value }}</h2>
+                </div>
+                <div class="metric-icon" [class]="'metric-icon--' + item.tone">
+                  <mat-icon>{{ item.icon }}</mat-icon>
+                </div>
               </div>
-              <div class="metric-icon" [class]="'metric-icon--' + item.tone">
-                <mat-icon>{{ item.icon }}</mat-icon>
+              <div class="metric-bottom">
+                <p class="metric-note">{{ item.note }}</p>
+                <span *ngIf="item.trend" class="metric-trend">{{ item.trend }}</span>
               </div>
-            </div>
-            <div class="metric-bottom">
-              <p class="metric-note">{{ item.note }}</p>
-              <span *ngIf="item.trend" class="metric-trend">{{ item.trend }}</span>
-            </div>
-          </article>
+            </article>
+          </ng-container>
+          <ng-template #skeletonKpis>
+            <article *ngFor="let _ of [1,2,3,4]" class="metric-card skeleton-pulse">
+              <div class="metric-top">
+                <div class="metric-info">
+                  <div class="skeleton-line skeleton-line--sm"></div>
+                  <div class="skeleton-line skeleton-line--lg"></div>
+                </div>
+                <div class="skeleton-circle"></div>
+              </div>
+              <div class="metric-bottom">
+                <div class="skeleton-line skeleton-line--sm" style="width:70%"></div>
+              </div>
+            </article>
+          </ng-template>
         </div>
       </section>
 
@@ -140,7 +157,7 @@ interface KpiCard {
             <app-data-table
               [columns]="criticosColumns"
               [rows]="productosCriticos"
-              [loading]="false"
+              [loading]="loading"
               [paginator]="false"
               [emptyState]="criticosEmpty">
               <ng-template [appCellDef]="'stock'" let-row>
@@ -171,7 +188,7 @@ interface KpiCard {
             <app-data-table
               [columns]="actividadColumns"
               [rows]="actividadReciente"
-              [loading]="false"
+              [loading]="loading"
               [paginator]="false"
               [emptyState]="actividadEmpty">
               <ng-template [appCellDef]="'fecha'" let-row>{{ row.fecha | date:'short' }}</ng-template>
@@ -438,6 +455,40 @@ interface KpiCard {
       min-height: 220px;
     }
 
+    .skeleton-pulse {
+      animation: dash-pulse 1.5s ease-in-out infinite;
+    }
+
+    .skeleton-line {
+      height: 14px;
+      border-radius: var(--app-radius-pill);
+      background: var(--app-surface-muted);
+      width: 100%;
+    }
+
+    .skeleton-line--sm {
+      height: 10px;
+      width: 60%;
+    }
+
+    .skeleton-line--lg {
+      height: 28px;
+      width: 50%;
+      margin-top: var(--app-space-1);
+    }
+
+    .skeleton-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--app-radius-3);
+      background: var(--app-surface-muted);
+    }
+
+    @keyframes dash-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
     @media (max-width: 980px) {
       .dashboard-charts,
       .dashboard-tables,
@@ -456,7 +507,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('salesChart') salesChartCanvas?: ElementRef<HTMLCanvasElement>;
 
   loading = false;
-  loaded = true;
+  loaded = false;
   kpis: DashboardKpi = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
   stockTotalResumen = 0;
   ventasTotalResumen = 0;
@@ -543,9 +594,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loading = true;
     this.api.dashboardResumen().pipe(
       timeout(8000),
-      catchError(() => {
+      catchError((err: HttpErrorResponse) => {
         this.resetDashboard();
-        this.notify.error('No se pudo cargar el dashboard');
+        const msg = err.error?.message ?? (err.status === 0 ? 'Backend no disponible' : 'No se pudo cargar el dashboard');
+        this.notify.error(msg);
         return of(null);
       }),
       finalize(() => {
