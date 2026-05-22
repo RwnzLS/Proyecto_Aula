@@ -1,7 +1,7 @@
-import { Component, Inject, computed } from '@angular/core';
+import { Component, DestroyRef, Inject, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -75,10 +75,14 @@ export interface StockMovementDialogResult {
           <span class="preview__arrow">{{ data.tipo === 'ENTRADA' ? '+' : '-' }} {{ cantidadActual() }}</span>
           <span>= Stock resultante <strong>{{ stockResultante() }}</strong></span>
         </p>
+        <p *ngIf="stockResultanteNegativo()" class="dialog-error" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          La salida no puede superar el stock disponible.
+        </p>
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Cancelar</button>
-        <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid">
+        <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || stockResultanteNegativo()">
           <mat-icon>{{ data.tipo === 'ENTRADA' ? 'add_box' : 'remove_circle' }}</mat-icon>
           Registrar
         </button>
@@ -111,9 +115,20 @@ export interface StockMovementDialogResult {
       background: rgba(176, 56, 50, 0.08);
     }
     .preview--danger strong { color: var(--app-danger); }
+    .dialog-error {
+      margin: var(--app-space-2) 0 0;
+      display: flex;
+      align-items: center;
+      gap: var(--app-space-1);
+      color: var(--app-danger);
+      font-size: var(--app-font-13);
+    }
+    .dialog-error mat-icon { font-size: 16px; width: 16px; height: 16px; }
   `]
 })
 export class StockMovementDialogComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   title = this.data.tipo === 'ENTRADA' ? 'Registrar entrada' : 'Registrar salida';
 
   readonly productoSearch = new FormControl<Producto | string | null>(null, { nonNullable: false });
@@ -164,6 +179,13 @@ export class StockMovementDialogComponent {
     if (this.data.producto) {
       this.productoSearch.setValue(this.data.producto);
     }
+
+    this.productoSearch.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(value => {
+        if (value && typeof value === 'object') return;
+        this.clearProductoSeleccionado(Boolean((value ?? '').toString().trim()));
+      });
   }
 
   displayProducto = (producto: Producto | string | null): string => {
@@ -175,10 +197,11 @@ export class StockMovementDialogComponent {
   onProductoSelected(event: MatAutocompleteSelectedEvent) {
     const producto = event.option.value as Producto;
     this.form.controls.productoId.setValue(producto.id);
+    this.form.controls.productoId.markAsTouched();
   }
 
   confirmar() {
-    if (this.form.invalid) {
+    if (this.form.invalid || this.stockResultanteNegativo()) {
       this.form.markAllAsTouched();
       return;
     }
@@ -188,5 +211,15 @@ export class StockMovementDialogComponent {
       cantidad: Math.abs(Number(value.cantidad) || 0),
       referencia: value.referencia
     });
+  }
+
+  private clearProductoSeleccionado(markTouched: boolean) {
+    if (this.form.controls.productoId.value !== 0) {
+      this.form.controls.productoId.setValue(0);
+    }
+
+    if (markTouched) {
+      this.form.controls.productoId.markAsTouched();
+    }
   }
 }

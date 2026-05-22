@@ -1,6 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, effect } from '@angular/core';
-import { Chart, TooltipItem } from 'chart.js/auto';
+import { Component, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,7 +8,6 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { DashboardKpi, MovimientoInventario, MovimientoTipoResumen, Producto, Rol } from '../../core/models';
-import { ThemeService } from '../../core/theme.service';
 import { NotifyService } from '../../shared/notify.service';
 import {
   CellDefDirective,
@@ -94,8 +92,17 @@ interface KpiCard {
               <p>Distribucion por tipo en los ultimos registros.</p>
             </div>
             <div class="doughnut-layout">
-              <div class="doughnut-canvas">
-                <canvas #movementsChart></canvas>
+              <div class="doughnut-canvas" *ngIf="movimientosPorTipo.length">
+                <div
+                  class="doughnut-chart"
+                  [style.background]="movementsDonutGradient"
+                  role="img"
+                  [attr.aria-label]="'Distribucion de movimientos, total ' + movimientosTotal + ' unidades'">
+                  <span class="doughnut-hole">
+                    <strong>{{ movimientosTotal }}</strong>
+                    <small>unidades</small>
+                  </span>
+                </div>
               </div>
               <ul class="doughnut-legend" *ngIf="movimientosPorTipo.length; else sinMovimientos">
                 <li *ngFor="let item of movimientosPorTipo">
@@ -114,12 +121,24 @@ interface KpiCard {
               <h2>Productos mas vendidos</h2>
               <p>Ranking calculado con movimientos de tipo SALIDA.</p>
             </div>
-            <canvas #salesChart [class.hidden-chart]="!topSales.length"></canvas>
-            <div *ngIf="!topSales.length" class="empty-state compact">
-              <mat-icon>point_of_sale</mat-icon>
-              <h3>Sin salidas registradas</h3>
-              <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
+            <div *ngIf="topSales.length; else sinVentas" class="sales-bars" role="list" aria-label="Productos mas vendidos">
+              <div *ngFor="let item of topSales" class="sales-bar-row" role="listitem">
+                <div class="sales-bar-header">
+                  <span class="sales-product" [title]="item.producto">{{ item.producto }}</span>
+                  <strong>{{ item.cantidad }} <small>unidades</small></strong>
+                </div>
+                <div class="sales-bar-track" [attr.aria-label]="item.producto + ': ' + item.cantidad + ' unidades'">
+                  <span class="sales-bar-fill" [style.width.%]="salesPercent(item.cantidad)"></span>
+                </div>
+              </div>
             </div>
+            <ng-template #sinVentas>
+              <div class="empty-state compact">
+                <mat-icon>point_of_sale</mat-icon>
+                <h3>Sin salidas registradas</h3>
+                <p>Cuando existan salidas, este ranking se actualizara automaticamente.</p>
+              </div>
+            </ng-template>
           </article>
         </div>
       </section>
@@ -296,10 +315,6 @@ interface KpiCard {
       min-height: 390px;
     }
 
-    .dashboard-chart canvas {
-      min-height: 280px;
-    }
-
     .doughnut-layout {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px);
@@ -310,6 +325,41 @@ interface KpiCard {
     .doughnut-canvas {
       position: relative;
       min-height: 240px;
+      display: grid;
+      place-items: center;
+    }
+
+    .doughnut-chart {
+      width: min(240px, 100%);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px var(--app-border);
+    }
+
+    .doughnut-hole {
+      width: 58%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 2px;
+      border-radius: 50%;
+      background: var(--app-surface);
+      color: var(--app-heading);
+      box-shadow: var(--app-elevation-1);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .doughnut-hole strong {
+      font-size: var(--app-font-28);
+      line-height: 1;
+    }
+
+    .doughnut-hole small {
+      color: var(--app-muted);
+      font-size: var(--app-font-12);
     }
 
     .doughnut-legend {
@@ -359,7 +409,60 @@ interface KpiCard {
       text-align: center;
     }
 
-    .hidden-chart { display: none !important; }
+    .sales-bars {
+      display: grid;
+      gap: var(--app-space-4);
+      align-content: center;
+      min-height: 280px;
+    }
+
+    .sales-bar-row {
+      display: grid;
+      gap: var(--app-space-2);
+    }
+
+    .sales-bar-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+      gap: var(--app-space-3);
+      color: var(--app-text);
+      font-size: var(--app-font-14);
+    }
+
+    .sales-product {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--app-heading);
+      font-weight: var(--app-weight-semibold);
+    }
+
+    .sales-bar-header strong {
+      color: var(--app-heading);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sales-bar-header small {
+      color: var(--app-muted);
+      font-size: var(--app-font-12);
+      font-weight: var(--app-weight-semibold);
+    }
+
+    .sales-bar-track {
+      height: 12px;
+      overflow: hidden;
+      border-radius: var(--app-radius-pill);
+      background: var(--app-surface-muted);
+      box-shadow: inset 0 0 0 1px var(--app-border);
+    }
+
+    .sales-bar-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--app-brand), var(--app-accent));
+    }
 
     .status-pill {
       display: inline-flex;
@@ -451,10 +554,7 @@ interface KpiCard {
     }
   `]
 })
-export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('movementsChart') movementsChartCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('salesChart') salesChartCanvas?: ElementRef<HTMLCanvasElement>;
-
+export class DashboardComponent implements OnInit {
   loading = false;
   loaded = true;
   kpis: DashboardKpi = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
@@ -493,23 +593,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     message: 'Las entradas, salidas y ajustes apareceran aqui.'
   };
 
-  private movementsChart?: Chart;
-  private salesChart?: Chart;
-  private viewReady = false;
-
   constructor(
     private api: ApiService,
     private auth: AuthService,
     private dialog: MatDialog,
     private notify: NotifyService,
-    private theme: ThemeService,
     private router: Router
-  ) {
-    effect(() => {
-      this.theme.isDark();
-      this.renderCharts();
-    });
-  }
+  ) {}
 
   get kpiCards(): KpiCard[] {
     const k = this.kpis;
@@ -525,18 +615,37 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.load();
   }
 
-  ngAfterViewInit() {
-    this.viewReady = true;
-    this.renderCharts();
-  }
-
-  ngOnDestroy() {
-    this.movementsChart?.destroy();
-    this.salesChart?.destroy();
-  }
-
   can(roles: Rol[]) {
     return this.auth.hasRole(roles);
+  }
+
+  get movimientosTotal() {
+    return this.movimientosPorTipo.reduce((total, item) => total + Math.max(0, Number(item.cantidad) || 0), 0);
+  }
+
+  get movementsDonutGradient() {
+    const total = this.movimientosTotal;
+    if (!total) return 'conic-gradient(var(--app-border) 0deg 360deg)';
+
+    const items = this.movimientosPorTipo
+      .map(item => ({ tipoMovimiento: item.tipoMovimiento, cantidad: Math.max(0, Number(item.cantidad) || 0) }))
+      .filter(item => item.cantidad > 0);
+
+    let start = 0;
+    const segments = items.map((item, index) => {
+      const end = index === items.length - 1 ? 360 : start + (item.cantidad / total) * 360;
+      const segment = `${this.movementColorVar(item.tipoMovimiento)} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+      start = end;
+      return segment;
+    });
+
+    return `conic-gradient(${segments.join(', ')})`;
+  }
+
+  salesPercent(cantidad: number) {
+    const max = this.topSales.reduce((mayor, item) => Math.max(mayor, Number(item.cantidad) || 0), 0);
+    if (!max || cantidad <= 0) return 0;
+    return Math.max(4, (cantidad / max) * 100);
   }
 
   load() {
@@ -551,7 +660,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       finalize(() => {
         this.loading = false;
         this.loaded = true;
-        this.renderCharts();
       })
     ).subscribe(resumen => {
       if (resumen) {
@@ -626,121 +734,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'primary';
   }
 
-  private renderCharts() {
-    if (!this.viewReady) return;
-    try {
-      this.renderMovementsChart();
-      this.renderSalesChart();
-    } catch (err) {
-      console.error('Dashboard chart render failed', err);
-    }
-  }
-
-  private renderMovementsChart() {
-    if (!this.movementsChartCanvas || !this.movimientosPorTipo.length) {
-      this.movementsChart?.destroy();
-      this.movementsChart = undefined;
-      return;
-    }
-    this.movementsChart?.destroy();
-    const byType = this.movimientosPorTipo.reduce((acc, movimiento) => {
-      acc.set(movimiento.tipoMovimiento, movimiento.cantidad);
-      return acc;
-    }, new Map<string, number>());
-    const labels = [...byType.keys()];
-    const values = [...byType.values()];
-
-    this.movementsChart = new Chart(this.movementsChartCanvas.nativeElement, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: [
-            this.cssVar('--app-success', '#2f855a'),
-            this.cssVar('--app-warning', '#c47a1c'),
-            this.cssVar('--app-accent', '#2f6fab')
-          ],
-          borderColor: this.cssVar('--app-surface', '#ffffff'),
-          borderWidth: 3
-        }]
-      },
-      options: {
-        ...this.chartOptions(),
-        cutout: '62%',
-        plugins: {
-          ...this.chartOptions().plugins,
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: TooltipItem<'doughnut'>) => `${ctx.label}: ${ctx.parsed} unidades`
-            }
-          }
-        }
-      }
-    });
-  }
-
-  private renderSalesChart() {
-    if (!this.salesChartCanvas || !this.topSales.length) {
-      this.salesChart?.destroy();
-      return;
-    }
-
-    this.salesChart?.destroy();
-    this.salesChart = new Chart(this.salesChartCanvas.nativeElement, {
-      type: 'bar',
-      data: {
-        labels: this.topSales.map(item => item.producto),
-        datasets: [{
-          label: 'Salidas',
-          data: this.topSales.map(item => item.cantidad),
-          backgroundColor: this.cssVar('--app-brand', '#00796b'),
-          borderRadius: 8
-        }]
-      },
-      options: {
-        ...this.chartOptions(),
-        plugins: {
-          ...this.chartOptions().plugins,
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx: TooltipItem<'bar'>) => {
-                const value = Number(ctx.parsed.y ?? 0);
-                return `${value} ${value === 1 ? 'unidad' : 'unidades'}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: this.cssVar('--app-muted', '#667775') },
-            grid: { color: this.cssVar('--app-border', '#dfe7e4') }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: this.cssVar('--app-muted', '#667775'), precision: 0 },
-            grid: { color: this.cssVar('--app-border', '#dfe7e4') }
-          }
-        }
-      }
-    });
-  }
-
-  private chartOptions() {
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          labels: { color: this.cssVar('--app-muted', '#667775') }
-        }
-      }
-    };
-  }
-
-  private cssVar(name: string, fallback: string) {
-    return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+  private movementColorVar(tipo: string) {
+    if (tipo === 'ENTRADA') return 'var(--app-success)';
+    if (tipo === 'SALIDA') return 'var(--app-warning)';
+    return 'var(--app-accent)';
   }
 }

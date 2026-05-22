@@ -210,7 +210,7 @@ export class RecepcionDialogComponent {
   }
 
   setCantidad(detalle: Detalle, event: Event) {
-    const raw = Number((event.target as HTMLInputElement).value) || 0;
+    const raw = this.parseCantidad((event.target as HTMLInputElement).value);
     const max = this.pendiente(detalle);
     const safe = Math.min(Math.max(0, raw), max);
     this.cantidades.update(map => ({ ...map, [detalle.id]: safe }));
@@ -232,13 +232,27 @@ export class RecepcionDialogComponent {
   }
 
   hayCantidades(): boolean {
-    return Object.values(this.cantidades()).some(value => value > 0);
+    return this.itemsRecepcion().length > 0;
   }
 
   confirmar() {
-    const items = this.data.orden.detalles
-      .map(detalle => ({ detalleId: detalle.id, cantidadRecibida: this.cantidad(detalle.id) }))
-      .filter(item => item.cantidadRecibida > 0);
+    if (!this.hayCantidades() || this.errorRow().size > 0) return;
+    const items = this.itemsRecepcion();
     this.dialogRef.close(items);
+  }
+
+  private itemsRecepcion(): RecepcionItem[] {
+    return this.data.orden.detalles
+      .map(detalle => ({
+        detalleId: detalle.id,
+        cantidadRecibida: Math.min(this.cantidad(detalle.id), this.pendiente(detalle))
+      }))
+      .filter(item => item.cantidadRecibida > 0);
+  }
+
+  private parseCantidad(value: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.trunc(parsed);
   }
 }

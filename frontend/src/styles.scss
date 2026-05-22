@@ -263,7 +263,6 @@ td.mat-mdc-cell {
 .section-header { display: flex; gap: var(--app-space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--app-space-2); }
 .mat-mdc-card { border-radius: var(--app-radius-3) !important; }
-canvas { max-height: 320px; }
 .chart-box { min-height: 340px; padding: var(--app-space-5); }
 .mat-mdc-chip.chip-danger, .mat-mdc-chip.warn { --mdc-chip-elevated-container-color: var(--app-danger); color: white; }
 .mat-mdc-chip.chip-ok, .mat-mdc-chip.success { --mdc-chip-elevated-container-color: var(--app-success); color: white; }
