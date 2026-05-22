@@ -40,6 +40,6 @@ public class GlobalExceptionHandler {
   }
 
   private ResponseEntity<?> error(HttpStatus status, String code, String message) {
-    return ResponseEntity.status(status).body(new ApiError(code, message, Instant.now()));
+    return ResponseEntity.status(status.value()).body(new ApiError(code, message, Instant.now()));
   }
 }

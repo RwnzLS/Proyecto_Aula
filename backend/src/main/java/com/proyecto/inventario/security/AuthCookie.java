@@ -1,6 +1,7 @@
 package com.proyecto.inventario.security;
 
 import java.time.Duration;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -27,12 +28,12 @@ public class AuthCookie {
                     @Value("${app.auth.cookie-same-site:Strict}") String sameSite,
                     @Value("${app.jwt.expiration-minutes}") long expirationMinutes) {
     this.secure = secure;
-    this.sameSite = sameSite;
+    this.sameSite = Objects.requireNonNull(sameSite, "sameSite");
     this.maxAge = Duration.ofMinutes(expirationMinutes);
   }
 
   public ResponseCookie create(String token) {
-    return build(token, maxAge);
+    return build(Objects.requireNonNull(token, "token"), maxAge);
   }
 
   public ResponseCookie clear() {
@@ -40,12 +41,12 @@ public class AuthCookie {
   }
 
   private ResponseCookie build(String value, Duration age) {
-    return ResponseCookie.from(NAME, value)
+    return ResponseCookie.from(NAME, Objects.requireNonNull(value, "value"))
       .httpOnly(true)
       .secure(secure)
       .sameSite(sameSite)
       .path("/")
-      .maxAge(age)
+      .maxAge(Objects.requireNonNull(age, "age"))
       .build();
   }
 }
