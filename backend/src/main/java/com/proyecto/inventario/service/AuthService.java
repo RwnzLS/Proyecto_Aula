@@ -6,6 +6,7 @@ import com.proyecto.inventario.dto.Dtos.SessionResponse;
 import com.proyecto.inventario.dto.Dtos.UserRequest;
 import com.proyecto.inventario.dto.Dtos.UsuarioResponse;
 import com.proyecto.inventario.entity.Usuario;
+import com.proyecto.inventario.exception.NotFoundException;
 import com.proyecto.inventario.repository.UsuarioRepository;
 import com.proyecto.inventario.security.JwtService;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class AuthService {
 
   public LoginResponse login(LoginRequest request) {
     auth.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
-    Usuario usuario = usuarios.findByEmail(request.email()).orElseThrow();
+    Usuario usuario = usuarios.findByEmail(request.email()).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     return new LoginResponse(jwt.generate(usuario), usuario.getNombre(), usuario.getEmail(), usuario.getRol());
   }
 

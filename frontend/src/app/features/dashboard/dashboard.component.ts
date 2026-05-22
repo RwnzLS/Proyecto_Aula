@@ -563,7 +563,6 @@ export class DashboardComponent implements OnInit {
   kpis: DashboardKpi = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
   stockTotalResumen = 0;
   ventasTotalResumen = 0;
-  productos: Producto[] = [];
   productosCriticos: Producto[] = [];
   movimientos: MovimientoInventario[] = [];
   movimientosPorTipo: MovimientoTipoResumen[] = [];
@@ -677,18 +676,6 @@ export class DashboardComponent implements OnInit {
         this.topSales = resumen.topVentas.map(item => ({ producto: item.producto, cantidad: item.cantidad }));
       }
     });
-
-    this.loadProductosForActions();
-  }
-
-  private loadProductosForActions() {
-    this.api.productos({ size: 200 }).pipe(
-      timeout(8000),
-      catchError(() => of({ content: [] })),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(productos => {
-      this.productos = productos.content;
-    });
   }
 
   private resetDashboard() {
@@ -703,7 +690,7 @@ export class DashboardComponent implements OnInit {
   }
 
   agregarProducto() {
-    const ref = this.dialog.open(ProductoFormDialogComponent, { width: '720px' });
+    const ref = this.dialog.open(ProductoFormDialogComponent, { width: '720px', data: {} });
     ref.afterClosed()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((result?: Partial<Producto>) => {
@@ -721,26 +708,32 @@ export class DashboardComponent implements OnInit {
   }
 
   registrarEntrada(producto?: Producto) {
-    if (!this.productos.length) {
-      this.notify.warning('Primero registra un producto para poder hacer entradas');
-      return;
-    }
-
-    const ref = this.dialog.open(StockMovementDialogComponent, { width: '520px', data: { productos: this.productos, producto, tipo: 'ENTRADA' } });
-    ref.afterClosed()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((result?: StockMovementDialogResult) => {
-        if (!result) return;
-        this.api.registrarEntrada(result)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe({
-            next: () => {
-              this.notify.success('Entrada registrada');
-              this.load();
-            },
-            error: () => this.notify.error('No se pudo registrar la entrada')
-          });
-      });
+    this.api.productos({ size: 200 }).pipe(
+      timeout(8000),
+      catchError(() => of({ content: [] as Producto[] })),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(result => {
+      const prods = result.content;
+      if (!prods.length) {
+        this.notify.warning('Primero registra un producto para poder hacer entradas');
+        return;
+      }
+      const ref = this.dialog.open(StockMovementDialogComponent, { width: '520px', data: { productos: prods, producto, tipo: 'ENTRADA' } });
+      ref.afterClosed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((dialogResult?: StockMovementDialogResult) => {
+          if (!dialogResult) return;
+          this.api.registrarEntrada(dialogResult)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: () => {
+                this.notify.success('Entrada registrada');
+                this.load();
+              },
+              error: () => this.notify.error('No se pudo registrar la entrada')
+            });
+        });
+    });
   }
 
   crearOrden() {

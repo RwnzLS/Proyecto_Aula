@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { MatButtonModule } from '@angular/material/button';
@@ -188,7 +189,7 @@ const FLOW: EstadoOrden[] = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBID
                           <div class="detalle-tabla">
                             <table class="lineas" aria-label="Detalle de productos">
                               <thead>
-                                <tr><th>Producto</th><th class="num">Solicitada</th><th class="num">Recibida</th><th class="num">Precio</th><th class="num">Subtotal</th></tr>
+                                <tr><th>Producto</th><th class="num">Solicitada</th><th class="num">Recibida</th><th class="num">Precio</th><th class="num">Subtotal rec.</th></tr>
                               </thead>
                               <tbody>
                                 @for (linea of o.detalles; track linea.id) {
@@ -197,7 +198,7 @@ const FLOW: EstadoOrden[] = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBID
                                     <td class="num">{{ linea.cantidadSolicitada }}</td>
                                     <td class="num">{{ linea.cantidadRecibida }}</td>
                                     <td class="num">{{ linea.precioUnitario | currency:'COP' }}</td>
-                                    <td class="num">{{ (linea.cantidadSolicitada * linea.precioUnitario) | currency:'COP' }}</td>
+                                    <td class="num">{{ ((linea.cantidadRecibida > 0 ? linea.cantidadRecibida : linea.cantidadSolicitada) * linea.precioUnitario) | currency:'COP' }}</td>
                                   </tr>
                                 }
                               </tbody>
@@ -336,6 +337,7 @@ const FLOW: EstadoOrden[] = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBID
   `]
 })
 export class OrdenesComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(MatDialog);
@@ -362,7 +364,9 @@ export class OrdenesComponent implements OnInit {
     this.pageIndex = page;
     this.pageSize = size;
     this.loading = true;
-    this.api.ordenes({ page, size }).subscribe({
+    this.api.ordenes({ page, size }).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
       next: ordenesPage => {
         this.ordenesPage = ordenesPage;
         this.ordenes = ordenesPage.content;
@@ -384,7 +388,6 @@ export class OrdenesComponent implements OnInit {
 
   ordenCreada() {
     this.loadOrdenes();
-    this.api.dashboard().subscribe();
   }
 
   toggleExpand(orden: OrdenCompra) {
@@ -424,10 +427,14 @@ export class OrdenesComponent implements OnInit {
   }
 
   enviar(orden: OrdenCompra) {
-    this.api.enviarOrden(orden.id).subscribe(() => {
-      this.notify.success(`Orden #${orden.id} enviada`);
-      this.loadOrdenes();
-      this.api.dashboard().subscribe();
+    this.api.enviarOrden(orden.id).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: () => {
+        this.notify.success(`Orden #${orden.id} enviada`);
+        this.loadOrdenes();
+      },
+      error: () => this.loadOrdenes()
     });
   }
 
@@ -441,10 +448,14 @@ export class OrdenesComponent implements OnInit {
         confirmLabel: 'Recibir'
       });
       if (!ok) return;
-      this.api.recibirOrden(orden.id, items).subscribe(() => {
-        this.notify.success('Recepcion registrada');
-        this.loadOrdenes();
-        this.api.dashboard().subscribe();
+      this.api.recibirOrden(orden.id, items).pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe({
+        next: () => {
+          this.notify.success('Recepcion registrada');
+          this.loadOrdenes();
+        },
+        error: () => this.loadOrdenes()
       });
     });
   }
@@ -458,10 +469,14 @@ export class OrdenesComponent implements OnInit {
       variant: 'danger'
     });
     if (!ok) return;
-    this.api.cancelarOrden(orden.id).subscribe(() => {
-      this.notify.warning(`Orden #${orden.id} cancelada`);
-      this.loadOrdenes();
-      this.api.dashboard().subscribe();
+    this.api.cancelarOrden(orden.id).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: () => {
+        this.notify.warning(`Orden #${orden.id} cancelada`);
+        this.loadOrdenes();
+      },
+      error: () => this.loadOrdenes()
     });
   }
 }

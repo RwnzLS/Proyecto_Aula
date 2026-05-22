@@ -20,7 +20,6 @@ import com.proyecto.inventario.repository.ProductoRepository;
 import com.proyecto.inventario.repository.ProveedorRepository;
 import com.proyecto.inventario.repository.UsuarioRepository;
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,18 +40,15 @@ public class OrdenService {
   private final UsuarioRepository usuarios;
   private final MovimientoInventarioRepository movimientos;
   private final EmailService email;
-  private final ProductoService productoService;
 
   public OrdenService(OrdenCompraRepository ordenes, ProductoRepository productos, ProveedorRepository proveedores,
-                      UsuarioRepository usuarios, MovimientoInventarioRepository movimientos, EmailService email,
-                      ProductoService productoService) {
+                      UsuarioRepository usuarios, MovimientoInventarioRepository movimientos, EmailService email) {
     this.ordenes = ordenes;
     this.productos = productos;
     this.proveedores = proveedores;
     this.usuarios = usuarios;
     this.movimientos = movimientos;
     this.email = email;
-    this.productoService = productoService;
   }
 
   @Transactional(readOnly = true)
@@ -71,7 +67,7 @@ public class OrdenService {
     Proveedor proveedor = proveedores.findById(request.proveedorId()).orElseThrow(() -> new NotFoundException("Proveedor no encontrado"));
     validarProveedorActivo(proveedor);
     orden.setProveedor(proveedor);
-    orden.setUsuario(usuarios.findByEmail(auth.getName()).orElseThrow());
+    orden.setUsuario(usuarios.findByEmail(auth.getName()).orElseThrow(() -> new NotFoundException("Usuario no encontrado")));
     orden.setFechaEsperada(request.fechaEsperada());
     orden.setObservaciones(request.observaciones());
     BigDecimal total = BigDecimal.ZERO;
@@ -96,6 +92,7 @@ public class OrdenService {
     if (orden.getEstado() != EstadoOrden.BORRADOR) throw new BusinessException("Solo se pueden enviar ordenes en borrador");
     orden.setEstado(EstadoOrden.ENVIADA);
     OrdenCompra saved = ordenes.save(orden);
+    initLazy(saved);
     email.sendTemplate(saved.getProveedor().getEmail(), "Orden de compra #" + saved.getId(), "orden-enviada",
       Map.of("ordenId", saved.getId(), "total", saved.getTotal()));
     return saved;
@@ -107,9 +104,8 @@ public class OrdenService {
     if (orden.getEstado() != EstadoOrden.ENVIADA && orden.getEstado() != EstadoOrden.RECIBIDA_PARCIAL) {
       throw new BusinessException("Solo se puede recibir mercancia en ordenes ENVIADA o RECIBIDA_PARCIAL");
     }
-    Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow();
+    Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     Map<Long, DetalleOrden> byId = orden.getDetalles().stream().collect(Collectors.toMap(DetalleOrden::getId, d -> d));
-    Map<Long, Producto> afectados = new LinkedHashMap<>();
     for (RecepcionItemRequest item : request.items()) {
       DetalleOrden detalle = Optional.ofNullable(byId.get(item.detalleId())).orElseThrow(() -> new NotFoundException("Detalle no encontrado"));
       int nuevoTotal = detalle.getCantidadRecibida() + item.cantidadRecibida();
@@ -127,16 +123,12 @@ public class OrdenService {
       movimiento.setReferencia("OC-" + orden.getId());
       movimientos.save(movimiento);
       productos.save(producto);
-      afectados.put(producto.getId(), producto);
     }
     boolean completa = orden.getDetalles().stream()
       .allMatch(detalle -> Objects.equals(detalle.getCantidadRecibida(), detalle.getCantidadSolicitada()));
     orden.setEstado(completa ? EstadoOrden.RECIBIDA : EstadoOrden.RECIBIDA_PARCIAL);
     OrdenCompra saved = ordenes.save(orden);
-    // La recepcion sube stock; si una recepcion parcial deja el producto en/bajo el minimo, avisar como en ajuste y salida.
-    afectados.values().stream()
-      .filter(producto -> producto.getCantidadStock() <= producto.getStockMinimo())
-      .forEach(productoService::notifyStock);
+    initLazy(saved);
     return saved;
   }
 
@@ -147,7 +139,9 @@ public class OrdenService {
       throw new BusinessException("No se puede cancelar una orden en estado " + orden.getEstado());
     }
     orden.setEstado(EstadoOrden.CANCELADA);
-    return ordenes.save(orden);
+    OrdenCompra saved = ordenes.save(orden);
+    initLazy(saved);
+    return saved;
   }
 
   @Transactional(readOnly = true)

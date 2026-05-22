@@ -48,7 +48,6 @@ class OrdenServiceTest {
   private UsuarioRepository usuarios;
   private MovimientoInventarioRepository movimientos;
   private EmailService email;
-  private ProductoService productoService;
   private OrdenService service;
   private Authentication auth;
 
@@ -60,8 +59,7 @@ class OrdenServiceTest {
     usuarios = mock(UsuarioRepository.class);
     movimientos = mock(MovimientoInventarioRepository.class);
     email = mock(EmailService.class);
-    productoService = mock(ProductoService.class);
-    service = new OrdenService(ordenes, productos, proveedores, usuarios, movimientos, email, productoService);
+    service = new OrdenService(ordenes, productos, proveedores, usuarios, movimientos, email);
 
     Usuario usuario = new Usuario();
     usuario.setEmail("gerente@inventario.local");
@@ -127,7 +125,7 @@ class OrdenServiceTest {
   }
 
   @Test
-  void recepcionCargaOrdenConBloqueoPesimista() {
+  void recepcionActualizaStockYEstadoEnParcial() {
     Producto producto = producto(true);
     producto.setCantidadStock(10);
     ReflectionTestUtils.setField(producto, "id", 2L);
@@ -154,32 +152,7 @@ class OrdenServiceTest {
   }
 
   @Test
-  void recepcionNotificaStockBajoSiProductoSigueDebajoDelMinimo() {
-    Producto producto = producto(true);
-    producto.setCantidadStock(2);
-    producto.setStockMinimo(10);
-    ReflectionTestUtils.setField(producto, "id", 2L);
-    DetalleOrden detalle = new DetalleOrden();
-    ReflectionTestUtils.setField(detalle, "id", 10L);
-    detalle.setProducto(producto);
-    detalle.setCantidadSolicitada(5);
-    detalle.setCantidadRecibida(0);
-    OrdenCompra orden = new OrdenCompra();
-    ReflectionTestUtils.setField(orden, "id", 1L);
-    orden.setEstado(EstadoOrden.ENVIADA);
-    orden.getDetalles().add(detalle);
-
-    when(ordenes.findByIdForUpdate(1L)).thenReturn(Optional.of(orden));
-    when(productos.findByIdForUpdate(2L)).thenReturn(Optional.of(producto));
-
-    service.recepcion(1L, new RecepcionRequest(List.of(new RecepcionItemRequest(10L, 3))), auth);
-
-    // 2 + 3 = 5, el producto sigue en/por debajo del minimo 10
-    verify(productoService).notifyStock(producto);
-  }
-
-  @Test
-  void recepcionNoNotificaCuandoElStockSuperaElMinimo() {
+  void recepcionCompletaTransicionaARecibida() {
     Producto producto = producto(true);
     producto.setCantidadStock(2);
     producto.setStockMinimo(4);
@@ -197,10 +170,10 @@ class OrdenServiceTest {
     when(ordenes.findByIdForUpdate(1L)).thenReturn(Optional.of(orden));
     when(productos.findByIdForUpdate(2L)).thenReturn(Optional.of(producto));
 
-    service.recepcion(1L, new RecepcionRequest(List.of(new RecepcionItemRequest(10L, 5))), auth);
+    OrdenCompra recibida = service.recepcion(1L, new RecepcionRequest(List.of(new RecepcionItemRequest(10L, 5))), auth);
 
-    // 2 + 5 = 7 supera el minimo 4
-    verify(productoService, never()).notifyStock(any());
+    assertThat(producto.getCantidadStock()).isEqualTo(7);
+    assertThat(recibida.getEstado()).isEqualTo(EstadoOrden.RECIBIDA);
   }
 
   @Test

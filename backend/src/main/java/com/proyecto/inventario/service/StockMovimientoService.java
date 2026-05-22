@@ -63,7 +63,7 @@ public class StockMovimientoService {
   }
 
   private MovimientoInventario guardarMovimiento(Producto producto, Integer cantidad, TipoMovimiento tipo, String referencia, Authentication auth) {
-    Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow();
+    Usuario user = usuarios.findByEmail(auth.getName()).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
     MovimientoInventario movimiento = new MovimientoInventario();
     movimiento.setProducto(producto);
     movimiento.setCantidad(cantidad);

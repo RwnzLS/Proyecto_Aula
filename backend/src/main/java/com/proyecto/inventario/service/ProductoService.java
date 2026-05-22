@@ -107,7 +107,7 @@ public class ProductoService {
     movimiento.setUsuarioResponsable(usuarios.findByEmail(auth.getName()).orElseThrow());
     movimientos.save(movimiento);
     Producto saved = productos.save(producto);
-    if (saved.getCantidadStock() <= saved.getStockMinimo()) notifyStock(saved);
+    if (cantidad < 0 && saved.getCantidadStock() <= saved.getStockMinimo()) notifyStock(saved);
     return saved;
   }
 
