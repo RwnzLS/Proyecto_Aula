@@ -391,6 +391,10 @@ td.mat-mdc-cell {
   color: inherit !important;
 }
 
+mat-stepper {
+  --mat-stepper-container-color: transparent;
+}
+
 body.theme-dark {
   .mat-mdc-card,
   .mat-mdc-dialog-container .mdc-dialog__surface,
@@ -453,6 +457,21 @@ body.theme-dark {
   .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label,
   .mat-mdc-tab.mdc-tab--active .mat-icon {
     color: var(--app-brand-strong);
+  }
+
+  mat-stepper {
+    --mat-stepper-line-color: var(--app-border);
+    --mat-stepper-header-icon-background-color: var(--app-surface-muted);
+    --mat-stepper-header-icon-foreground-color: var(--app-text);
+  }
+
+  .mat-step-label,
+  .mat-step-label.mat-step-label-selected {
+    color: var(--app-text) !important;
+  }
+
+  .mat-step-optional {
+    color: var(--app-muted) !important;
   }
 }
 
