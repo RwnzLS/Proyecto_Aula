@@ -1,5 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -555,6 +556,8 @@ interface KpiCard {
   `]
 })
 export class DashboardComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   loading = false;
   loaded = true;
   kpis: DashboardKpi = { totalProductos: 0, stockBajo: 0, ordenesPendientes: 0, proveedoresActivos: 0 };
@@ -660,7 +663,8 @@ export class DashboardComponent implements OnInit {
       finalize(() => {
         this.loading = false;
         this.loaded = true;
-      })
+      }),
+      takeUntilDestroyed(this.destroyRef)
     ).subscribe(resumen => {
       if (resumen) {
         this.kpis = resumen.kpis;
@@ -680,7 +684,8 @@ export class DashboardComponent implements OnInit {
   private loadProductosForActions() {
     this.api.productos({ size: 200 }).pipe(
       timeout(8000),
-      catchError(() => of({ content: [] }))
+      catchError(() => of({ content: [] })),
+      takeUntilDestroyed(this.destroyRef)
     ).subscribe(productos => {
       this.productos = productos.content;
     });
@@ -699,13 +704,20 @@ export class DashboardComponent implements OnInit {
 
   agregarProducto() {
     const ref = this.dialog.open(ProductoFormDialogComponent, { width: '720px' });
-    ref.afterClosed().subscribe((result?: Partial<Producto>) => {
-      if (!result) return;
-      this.api.crearProducto(result).subscribe(() => {
-        this.notify.success('Producto guardado');
-        this.load();
+    ref.afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result?: Partial<Producto>) => {
+        if (!result) return;
+        this.api.crearProducto(result)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => {
+              this.notify.success('Producto guardado');
+              this.load();
+            },
+            error: () => this.notify.error('No se pudo guardar el producto')
+          });
       });
-    });
   }
 
   registrarEntrada(producto?: Producto) {
@@ -715,13 +727,20 @@ export class DashboardComponent implements OnInit {
     }
 
     const ref = this.dialog.open(StockMovementDialogComponent, { width: '520px', data: { productos: this.productos, producto, tipo: 'ENTRADA' } });
-    ref.afterClosed().subscribe((result?: StockMovementDialogResult) => {
-      if (!result) return;
-      this.api.registrarEntrada(result).subscribe(() => {
-        this.notify.success('Entrada registrada');
-        this.load();
+    ref.afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result?: StockMovementDialogResult) => {
+        if (!result) return;
+        this.api.registrarEntrada(result)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => {
+              this.notify.success('Entrada registrada');
+              this.load();
+            },
+            error: () => this.notify.error('No se pudo registrar la entrada')
+          });
       });
-    });
   }
 
   crearOrden() {
