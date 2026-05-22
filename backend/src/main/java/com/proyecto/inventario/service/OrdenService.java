@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -59,7 +60,9 @@ public class OrdenService {
     Specification<OrdenCompra> spec = (root, query, cb) -> cb.conjunction();
     if (estado != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("estado"), estado));
     if (proveedorId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("proveedor").get("id"), proveedorId));
-    return ordenes.findAll(spec, pageable);
+    Page<OrdenCompra> page = ordenes.findAll(spec, pageable);
+    page.getContent().forEach(this::initLazy);
+    return page;
   }
 
   @Transactional
@@ -149,7 +152,16 @@ public class OrdenService {
 
   @Transactional(readOnly = true)
   public OrdenCompra get(Long id) {
-    return ordenes.findById(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
+    OrdenCompra orden = ordenes.findById(id).orElseThrow(() -> new NotFoundException("Orden no encontrada"));
+    initLazy(orden);
+    return orden;
+  }
+
+  private void initLazy(OrdenCompra o) {
+    Hibernate.initialize(o.getProveedor());
+    Hibernate.initialize(o.getUsuario());
+    Hibernate.initialize(o.getDetalles());
+    o.getDetalles().forEach(d -> Hibernate.initialize(d.getProducto()));
   }
 
   private OrdenCompra getForUpdate(Long id) {
