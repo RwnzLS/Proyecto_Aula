@@ -43,7 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Proveedores', icon: 'business', link: '/proveedores', roles: ['ADMIN', 'GERENTE'] },
       { label: 'Precios', icon: 'monitoring', link: '/precios', roles: ['ADMIN', 'GERENTE'] },
-      { label: 'Ordenes', icon: 'receipt_long', link: '/ordenes', roles: ['ADMIN', 'GERENTE'] }
+      { label: 'Ordenes', icon: 'receipt_long', link: '/ordenes', roles: ['ADMIN', 'GERENTE', 'ALMACENISTA'] }
     ]
   },
   {
@@ -233,6 +233,7 @@ export class ShellComponent implements OnInit {
     this.shortcuts.start();
     this.shortcuts.register('?', () => this.abrirAtajos());
     this.shortcuts.register('/', () => this.focusPrimerFiltro());
+    this.shortcuts.register('esc', () => this.closeActiveOverlay());
     this.shortcuts.register('g d', () => this.go('/dashboard'));
     this.shortcuts.register('g p', () => this.go('/productos'));
     this.shortcuts.register('g m', () => this.go('/movimientos'));
@@ -277,5 +278,17 @@ export class ShellComponent implements OnInit {
       '.filter-panel input, .filter-panel .mat-mdc-select-trigger, .filters-panel input, .filters-panel .mat-mdc-select-trigger'
     );
     target?.focus();
+  }
+
+  private closeActiveOverlay(): void {
+    const dialogRef = this.dialog.openDialogs[this.dialog.openDialogs.length - 1];
+    if (dialogRef && !dialogRef.disableClose) {
+      dialogRef.close();
+      return;
+    }
+
+    if (this.isMobile() && this.sidenavOpen()) {
+      this.sidenavOpen.set(false);
+    }
   }
 }

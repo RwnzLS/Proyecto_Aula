@@ -40,7 +40,7 @@ export class KeyboardShortcutsService {
 
     fromEvent<KeyboardEvent>(window, 'keydown')
       .pipe(
-        filter(event => !this.shouldIgnore(event)),
+        filter(event => event.key === 'Escape' || !this.shouldIgnore(event)),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(event => this.handle(event));
@@ -55,7 +55,8 @@ export class KeyboardShortcutsService {
   }
 
   private normalize(key: string): string {
-    return key.trim().toLowerCase();
+    const normalized = key.trim().toLowerCase();
+    return normalized === 'escape' ? 'esc' : normalized;
   }
 
   private shouldIgnore(event: KeyboardEvent): boolean {
@@ -70,10 +71,20 @@ export class KeyboardShortcutsService {
   }
 
   private handle(event: KeyboardEvent): void {
-    const key = event.key;
+    const key = this.normalize(event.key);
+
+    if (key === 'esc') {
+      this.clearPrefix();
+      const handler = this.listeners.get('esc');
+      if (handler) {
+        event.preventDefault();
+        handler();
+      }
+      return;
+    }
 
     if (this.pendingPrefix) {
-      const candidate = `${this.pendingPrefix} ${key.toLowerCase()}`;
+      const candidate = `${this.pendingPrefix} ${key}`;
       const handler = this.listeners.get(candidate);
       this.clearPrefix();
       if (handler) {
@@ -101,7 +112,7 @@ export class KeyboardShortcutsService {
       return;
     }
 
-    if (key.toLowerCase() === 'g') {
+    if (key === 'g') {
       event.preventDefault();
       this.pendingPrefix = 'g';
       this.pendingTimer = setTimeout(() => this.clearPrefix(), SEQUENCE_TIMEOUT_MS);

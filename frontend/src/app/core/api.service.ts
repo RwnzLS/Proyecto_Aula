@@ -15,6 +15,7 @@ export class ApiService {
   }
   crearProducto(body: Partial<Producto>) { return this.http.post<Producto>(`${this.api}/productos`, body); }
   actualizarProducto(id: number, body: Partial<Producto>) { return this.http.put<Producto>(`${this.api}/productos/${id}`, body); }
+  eliminarProducto(id: number) { return this.http.delete<void>(`${this.api}/productos/${id}`); }
   reactivarProducto(id: number) { return this.http.patch<Producto>(`${this.api}/productos/${id}/reactivar`, {}); }
   ajustarStock(id: number, cantidad: number, motivo: string) { return this.http.patch<Producto>(`${this.api}/productos/${id}/ajustar-stock`, { cantidad, motivo }); }
   registrarEntrada(body: { productoId: number; cantidad: number; referencia: string }) { return this.http.post<MovimientoInventario>(`${this.api}/entradas`, body); }
@@ -24,6 +25,7 @@ export class ApiService {
     return this.http.get<Page<Proveedor>>(`${this.api}/proveedores`, { params: this.params(filters) });
   }
   guardarProveedor(body: Partial<Proveedor>, id?: number) { return id ? this.http.put<Proveedor>(`${this.api}/proveedores/${id}`, body) : this.http.post<Proveedor>(`${this.api}/proveedores`, body); }
+  eliminarProveedor(id: number) { return this.http.delete<void>(`${this.api}/proveedores/${id}`); }
 
   historialPrecios(filters: { productoId?: number; proveedorId?: number } = {}) { return this.http.get<PrecioProveedor[]>(`${this.api}/precios/historial`, { params: this.params(filters) }); }
   ultimoPrecio(filters: { productoId: number; proveedorId: number }) { return this.http.get<PrecioProveedor>(`${this.api}/precios/ultimo`, { params: this.params(filters) }); }

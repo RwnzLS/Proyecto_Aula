@@ -348,7 +348,7 @@ export class OrdenFormComponent implements OnInit {
   onProductoInput(index: number, event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.productoInputs.update(values => values.map((v, i) => i === index ? value : v));
-    if (!value) {
+    if (this.productoLabel(index) !== value) {
       this.detallesArray.at(index).patchValue({ productoId: 0 });
     }
   }

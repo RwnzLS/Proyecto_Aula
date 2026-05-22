@@ -18,6 +18,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Page, Producto, Rol } from '../../core/models';
+import { ConfirmService } from '../../shared/confirm.service';
 import { NotifyService } from '../../shared/notify.service';
 import {
   CellDefDirective,
@@ -155,9 +156,13 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
                   <mat-icon>edit</mat-icon>
                   <span>Editar</span>
                 </button>
-                <button mat-menu-item *ngIf="can(['ADMIN','ALMACENISTA'])" (click)="ajustar(row)">
+                <button mat-menu-item *ngIf="can(['ADMIN','ALMACENISTA']) && row.activo" (click)="ajustar(row)">
                   <mat-icon>inventory</mat-icon>
                   <span>Ajustar stock</span>
+                </button>
+                <button mat-menu-item *ngIf="can(['ADMIN']) && row.activo" (click)="desactivar(row)">
+                  <mat-icon>block</mat-icon>
+                  <span>Desactivar</span>
                 </button>
                 <button mat-menu-item *ngIf="can(['ADMIN']) && !row.activo" (click)="reactivar(row)">
                   <mat-icon>restart_alt</mat-icon>
@@ -170,8 +175,11 @@ import { ProductoFormDialogComponent } from './producto-form-dialog.component';
                 <button *ngIf="can(['ADMIN'])" mat-icon-button title="Editar" (click)="abrirProducto(row)">
                   <mat-icon>edit</mat-icon>
                 </button>
-                <button *ngIf="can(['ADMIN','ALMACENISTA'])" mat-icon-button title="Ajustar stock" (click)="ajustar(row)">
+                <button *ngIf="can(['ADMIN','ALMACENISTA']) && row.activo" mat-icon-button title="Ajustar stock" (click)="ajustar(row)">
                   <mat-icon>inventory</mat-icon>
+                </button>
+                <button *ngIf="can(['ADMIN']) && row.activo" mat-icon-button title="Desactivar" (click)="desactivar(row)">
+                  <mat-icon>block</mat-icon>
                 </button>
                 <button *ngIf="can(['ADMIN']) && !row.activo" mat-icon-button title="Reactivar" (click)="reactivar(row)">
                   <mat-icon>restart_alt</mat-icon>
@@ -264,6 +272,7 @@ export class ProductosComponent implements OnInit {
     private auth: AuthService,
     private fb: FormBuilder,
     private dialog: MatDialog,
+    private confirmService: ConfirmService,
     private notify: NotifyService
   ) {}
 
@@ -348,6 +357,23 @@ export class ProductosComponent implements OnInit {
         this.notify.success('Stock ajustado');
         this.loadProductos();
       });
+    });
+  }
+
+  async desactivar(producto: Producto) {
+    const ok = await this.confirmService.confirm({
+      title: 'Desactivar producto',
+      message: `El producto ${producto.nombre} dejara de aparecer en filtros operativos. Continuar?`,
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Volver',
+      variant: 'danger'
+    });
+    if (!ok) return;
+
+    this.api.eliminarProducto(producto.id).subscribe(() => {
+      this.notify.warning('Producto desactivado');
+      const nextPage = this.productos.length === 1 && this.pageIndex > 0 ? this.pageIndex - 1 : this.pageIndex;
+      this.loadProductos(nextPage, this.pageSize);
     });
   }
 

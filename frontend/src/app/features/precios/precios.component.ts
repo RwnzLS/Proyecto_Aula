@@ -1,7 +1,6 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Chart } from 'chart.js/auto';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,10 +13,38 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/api.service';
 import { PrecioProveedor, Producto, Proveedor } from '../../core/models';
-import { ThemeService } from '../../core/theme.service';
 import { NotifyService } from '../../shared/notify.service';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { PageHeaderComponent } from '../../shared/page-header.component';
+
+const PRICE_CHART = {
+  width: 640,
+  height: 320,
+  top: 20,
+  right: 20,
+  bottom: 48,
+  left: 56
+};
+
+interface PriceChartPoint {
+  x: number;
+  y: number;
+  fecha: string;
+  fechaCorta: string;
+  precio: number;
+  moneda: string;
+  producto: string;
+}
+
+interface PriceChartData {
+  points: string;
+  pointsData: PriceChartPoint[];
+  yTicks: { y: number; value: number }[];
+  xTicks: { x: number; label: string }[];
+  moneda: string;
+  plotLeft: number;
+  plotRight: number;
+}
 
 @Component({
   selector: 'app-precios',
@@ -129,7 +156,9 @@ import { PageHeaderComponent } from '../../shared/page-header.component';
             </strong>
           </div>
           <div class="sparkline-wrap" matTooltip="Tendencia ultimas {{ r.serie.length }} muestras">
-            <canvas #sparkline class="sparkline"></canvas>
+            <svg class="sparkline" viewBox="0 0 140 44" preserveAspectRatio="none" aria-hidden="true">
+              <polyline *ngIf="sparklinePoints() as points" [attr.points]="points" />
+            </svg>
           </div>
         </div>
       </div>
@@ -138,8 +167,43 @@ import { PageHeaderComponent } from '../../shared/page-header.component';
         <mat-progress-bar mode="indeterminate" />
       }
 
-      <div class="chart-box">
-        <canvas #priceChart></canvas>
+      <div class="chart-box price-chart-box">
+        <ng-container *ngIf="priceChartData() as chart">
+          <svg
+            *ngIf="chart.pointsData.length; else sinDatosGrafico"
+            class="price-chart"
+            viewBox="0 0 640 320"
+            role="img"
+            [attr.aria-label]="'Historial de precios con ' + chart.pointsData.length + ' registros'">
+            <g class="price-grid">
+              <line
+                *ngFor="let tick of chart.yTicks"
+                [attr.x1]="chart.plotLeft"
+                [attr.x2]="chart.plotRight"
+                [attr.y1]="tick.y"
+                [attr.y2]="tick.y" />
+            </g>
+            <polyline class="price-line" [attr.points]="chart.points" />
+            <g class="price-points">
+              <circle *ngFor="let point of chart.pointsData" [attr.cx]="point.x" [attr.cy]="point.y" r="4" tabindex="0">
+                <title>{{ point.producto }} - {{ point.fecha }} - {{ point.precio | currency:point.moneda }}</title>
+              </circle>
+            </g>
+            <g class="price-axis price-axis-y">
+              <text *ngFor="let tick of chart.yTicks" x="48" [attr.y]="tick.y + 4" text-anchor="end">
+                {{ tick.value | currency:chart.moneda:'symbol':'1.0-0' }}
+              </text>
+            </g>
+            <g class="price-axis price-axis-x">
+              <text *ngFor="let tick of chart.xTicks" [attr.x]="tick.x" y="304" text-anchor="middle">
+                {{ tick.label }}
+              </text>
+            </g>
+          </svg>
+          <ng-template #sinDatosGrafico>
+            <app-empty-state icon="show_chart" title="Sin datos para graficar" message="Registra precios para construir el historial." />
+          </ng-template>
+        </ng-container>
       </div>
 
       <div class="data-panel">
@@ -214,7 +278,56 @@ import { PageHeaderComponent } from '../../shared/page-header.component';
       width: 140px;
       height: 44px;
     }
-    .sparkline { width: 100%; height: 100%; display: block; }
+    .sparkline {
+      width: 100%;
+      height: 100%;
+      display: block;
+      color: var(--app-brand);
+    }
+    .sparkline polyline {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .price-chart-box {
+      display: grid;
+      align-items: stretch;
+    }
+    .price-chart {
+      width: 100%;
+      min-height: 300px;
+      display: block;
+      overflow: visible;
+    }
+    .price-grid line {
+      stroke: var(--app-border);
+      stroke-width: 1;
+    }
+    .price-line {
+      fill: none;
+      stroke: var(--app-brand);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .price-points circle {
+      fill: var(--app-surface);
+      stroke: var(--app-warning);
+      stroke-width: 2;
+      outline: none;
+    }
+    .price-points circle:hover,
+    .price-points circle:focus {
+      fill: var(--app-warning);
+      stroke: var(--app-brand-strong);
+    }
+    .price-axis text {
+      fill: var(--app-muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
 
     @media (max-width: 760px) {
       .filter-panel--chips { grid-template-columns: 1fr; }
@@ -223,14 +336,10 @@ import { PageHeaderComponent } from '../../shared/page-header.component';
     }
   `]
 })
-export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('priceChart') chartCanvas?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('sparkline') sparklineCanvas?: ElementRef<HTMLCanvasElement>;
-
+export class PreciosComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly notify = inject(NotifyService);
-  private readonly theme = inject(ThemeService);
 
   loading = false;
   productos: Producto[] = [];
@@ -240,8 +349,6 @@ export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
   precioCols = ['fecha', 'producto', 'proveedor', 'precio'];
   pageIndex = 0;
   pageSize = 20;
-  chart?: Chart;
-  sparkline?: Chart;
 
   readonly preciosSignal = signal<PrecioProveedor[]>([]);
   readonly productosSignal = signal<Producto[]>([]);
@@ -264,6 +371,9 @@ export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
     return { ultimo, delta, serie };
   });
 
+  readonly priceChartData = computed(() => this.buildPriceChartData(this.preciosSignal()));
+  readonly sparklinePoints = computed(() => this.buildSparklinePoints(this.resumen()?.serie ?? []));
+
   precioForm = this.fb.nonNullable.group({
     productoId: [0, [Validators.required, Validators.min(1)]],
     proveedorId: [0, [Validators.required, Validators.min(1)]],
@@ -271,33 +381,11 @@ export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
     moneda: ['COP', Validators.required]
   });
 
-  constructor() {
-    effect(() => {
-      this.theme.isDark();
-      this.renderChart();
-      this.renderSparkline();
-    });
-    effect(() => {
-      this.preciosSignal();
-      queueMicrotask(() => this.renderSparkline());
-    });
-  }
-
   ngOnInit() {
     this.loadProductos();
     this.loadProveedores();
     this.loadPrecios();
     this.productoFiltro.valueChanges.subscribe(() => this.loadPrecios());
-  }
-
-  ngAfterViewInit() {
-    this.renderChart();
-    this.renderSparkline();
-  }
-
-  ngOnDestroy() {
-    this.chart?.destroy();
-    this.sparkline?.destroy();
   }
 
   loadProductos() {
@@ -327,7 +415,6 @@ export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
         this.pageIndex = 0;
         this.updatePage();
         this.loading = false;
-        this.renderChart();
       },
       error: () => {
         this.loading = false;
@@ -368,70 +455,95 @@ export class PreciosComponent implements OnInit, AfterViewInit, OnDestroy {
     this.preciosPagina = this.precios.slice(start, start + this.pageSize);
   }
 
-  private renderChart() {
-    if (!this.chartCanvas) return;
-    this.chart?.destroy();
-    const ordered = [...this.precios].reverse();
-    const textColor = this.cssVar('--app-muted', '#667775');
-    const gridColor = this.cssVar('--app-border', '#dfe7e4');
-    const brandColor = this.cssVar('--app-brand', '#00796b');
-    const accentColor = this.cssVar('--app-warning', '#c47a1c');
-    this.chart = new Chart(this.chartCanvas.nativeElement, {
-      type: 'line',
-      data: {
-        labels: ordered.map(precio => new Date(precio.fechaRegistro).toLocaleDateString()),
-        datasets: [{
-          label: 'Precio',
-          data: ordered.map(precio => precio.precioUnitario),
-          borderColor: brandColor,
-          backgroundColor: accentColor,
-          pointBackgroundColor: accentColor,
-          pointBorderColor: brandColor,
-          tension: 0.25
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: textColor } } },
-        scales: {
-          x: { ticks: { color: textColor }, grid: { color: gridColor } },
-          y: { ticks: { color: textColor }, grid: { color: gridColor } }
-        }
-      }
+  private buildPriceChartData(precios: PrecioProveedor[]): PriceChartData {
+    const plotRight = PRICE_CHART.width - PRICE_CHART.right;
+    const plotBottom = PRICE_CHART.height - PRICE_CHART.bottom;
+    const plotWidth = plotRight - PRICE_CHART.left;
+    const plotHeight = plotBottom - PRICE_CHART.top;
+    const empty = {
+      points: '',
+      pointsData: [],
+      yTicks: [],
+      xTicks: [],
+      moneda: 'COP',
+      plotLeft: PRICE_CHART.left,
+      plotRight
+    };
+
+    const ordered = [...precios].sort((a, b) => new Date(a.fechaRegistro).getTime() - new Date(b.fechaRegistro).getTime());
+    if (!ordered.length) return empty;
+
+    const values = ordered.map(precio => Math.max(0, Number(precio.precioUnitario) || 0));
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+    if (min === max) {
+      const padding = max === 0 ? 1 : max * 0.1;
+      min = Math.max(0, min - padding);
+      max += padding;
+    }
+    const range = max - min || 1;
+
+    const pointsData = ordered.map((precio, index) => {
+      const value = Math.max(0, Number(precio.precioUnitario) || 0);
+      const x = PRICE_CHART.left + (ordered.length === 1 ? plotWidth / 2 : (index / (ordered.length - 1)) * plotWidth);
+      const y = PRICE_CHART.top + (1 - ((value - min) / range)) * plotHeight;
+      const fecha = new Date(precio.fechaRegistro);
+      return {
+        x,
+        y,
+        fecha: fecha.toLocaleString(),
+        fechaCorta: fecha.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        precio: value,
+        moneda: precio.moneda || 'COP',
+        producto: precio.producto?.nombre ?? 'Producto'
+      };
     });
+
+    const yTicks = [0, 1, 2, 3, 4].map(index => {
+      const ratio = index / 4;
+      return {
+        y: PRICE_CHART.top + ratio * plotHeight,
+        value: max - ratio * range
+      };
+    });
+
+    return {
+      points: pointsData.map(point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' '),
+      pointsData,
+      yTicks,
+      xTicks: this.buildXAxisTicks(pointsData),
+      moneda: pointsData[pointsData.length - 1]?.moneda ?? 'COP',
+      plotLeft: PRICE_CHART.left,
+      plotRight
+    };
   }
 
-  private renderSparkline() {
-    if (!this.sparklineCanvas) return;
-    const resumen = this.resumen();
-    this.sparkline?.destroy();
-    if (!resumen || resumen.serie.length < 2) return;
-    const brandColor = this.cssVar('--app-brand', '#00796b');
-    this.sparkline = new Chart(this.sparklineCanvas.nativeElement, {
-      type: 'line',
-      data: {
-        labels: resumen.serie.map((_, index) => String(index + 1)),
-        datasets: [{
-          data: resumen.serie,
-          borderColor: brandColor,
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          borderWidth: 2,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-        scales: { x: { display: false }, y: { display: false } },
-        elements: { line: { capBezierPoints: true } }
-      }
-    });
+  private buildXAxisTicks(points: PriceChartPoint[]) {
+    if (points.length <= 5) {
+      return points.map(point => ({ x: point.x, label: point.fechaCorta }));
+    }
+
+    const indexes = [0, 0.25, 0.5, 0.75, 1].map(ratio => Math.round((points.length - 1) * ratio));
+    return [...new Set(indexes)].map(index => ({ x: points[index].x, label: points[index].fechaCorta }));
   }
 
-  private cssVar(name: string, fallback: string) {
-    return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+  private buildSparklinePoints(serie: number[]) {
+    if (serie.length < 2) return '';
+
+    const width = 140;
+    const height = 44;
+    const padding = 4;
+    const values = serie.map(value => Math.max(0, Number(value) || 0));
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const plotWidth = width - padding * 2;
+    const plotHeight = height - padding * 2;
+
+    return values.map((value, index) => {
+      const x = padding + (index / (values.length - 1)) * plotWidth;
+      const y = range === 0 ? height / 2 : padding + (1 - ((value - min) / range)) * plotHeight;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
   }
 }

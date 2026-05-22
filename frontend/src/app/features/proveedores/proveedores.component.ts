@@ -13,6 +13,7 @@ import { PageEvent } from '@angular/material/paginator';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Page, Proveedor, Rol } from '../../core/models';
+import { ConfirmService } from '../../shared/confirm.service';
 import { NotifyService } from '../../shared/notify.service';
 import { PageHeaderComponent } from '../../shared/page-header.component';
 import {
@@ -120,6 +121,9 @@ import { ProveedorFormDialogComponent } from './proveedor-form-dialog.component'
                 <button mat-icon-button matTooltip="Editar proveedor" (click)="abrirProveedor(row)">
                   <mat-icon>edit</mat-icon>
                 </button>
+                <button mat-icon-button matTooltip="Desactivar proveedor" (click)="desactivar(row)">
+                  <mat-icon>block</mat-icon>
+                </button>
               }
             </div>
           </ng-template>
@@ -164,6 +168,7 @@ export class ProveedoresComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly dialog = inject(MatDialog);
+  private readonly confirmService = inject(ConfirmService);
   private readonly notify = inject(NotifyService);
 
   loading = false;
@@ -234,6 +239,24 @@ export class ProveedoresComponent implements OnInit {
         this.loadProveedores();
         this.api.dashboard().subscribe();
       });
+    });
+  }
+
+  async desactivar(proveedor: Proveedor) {
+    const ok = await this.confirmService.confirm({
+      title: 'Desactivar proveedor',
+      message: `El proveedor ${proveedor.nombre} dejara de aparecer en sugerencias y listados activos. Continuar?`,
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Volver',
+      variant: 'danger'
+    });
+    if (!ok) return;
+
+    this.api.eliminarProveedor(proveedor.id).subscribe(() => {
+      this.notify.warning('Proveedor desactivado');
+      const nextPage = this.proveedores.length === 1 && this.pageIndex > 0 ? this.pageIndex - 1 : this.pageIndex;
+      this.loadProveedores(nextPage, this.pageSize);
+      this.api.dashboard().subscribe();
     });
   }
 }

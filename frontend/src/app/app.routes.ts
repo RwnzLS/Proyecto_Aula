@@ -48,7 +48,7 @@ export const routes: Routes = [
       },
       {
         path: 'ordenes',
-        canActivate: [roleGuard([...ADMIN_GERENTE])],
+        canActivate: [roleGuard([...ALL_ROLES])],
         loadComponent: () =>
           import('./features/ordenes/ordenes.component').then(m => m.OrdenesComponent)
       },
